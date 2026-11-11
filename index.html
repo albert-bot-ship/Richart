@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Richart權益">
+<meta name="theme-color" content="#07070F">
+<title>Richart 權益查詢</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,500;1,6..96,700&family=Noto+Serif+TC:wght@600;700;900&display=swap">
+<link rel="stylesheet" href="style.css">
+<script>
+/* 先套用主題，避免開啟時閃白 */
+(function(){try{
+  var p=JSON.parse(localStorage.getItem('rc.theme')||'"auto"');
+  var h=new Date().getHours();
+  document.documentElement.setAttribute('data-theme', p==='auto' ? (h>=6&&h<18?'light':'dark') : p);
+}catch(e){}})();
+</script>
+</head>
+<body>
+<div class="statusbar" aria-hidden="true"></div>
+
+<header class="app-header" id="header">
+  <div class="head-inner">
+    <div class="head-row">
+      <h1 class="app-title">Richart 權益<small>台新 Richart卡</small></h1>
+      <button class="icon-btn" data-act="settings" aria-label="設定" id="btnSettings"></button>
+    </div>
+    <div class="search" role="search">
+      <span id="searchIcon"></span>
+      <input id="q" type="search" placeholder="搜尋商家名稱" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="搜尋商家名稱">
+      <button class="clear" id="btnClear" data-act="clearq" aria-label="清除搜尋" hidden></button>
+    </div>
+    <nav class="chips" id="chips" aria-label="類別"></nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page" id="page-home" aria-label="首頁"></section>
+  <section class="page" id="page-search" aria-label="搜尋" hidden></section>
+  <section class="page" id="page-wallet" aria-label="錢包" hidden></section>
+  <section class="page" id="page-favs" aria-label="收藏" hidden></section>
+</main>
+
+<nav class="tabbar" aria-label="主要頁面"><div class="in" id="tabbar"></div></nav>
+
+<div class="backdrop" id="backdrop" data-act="close"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="設定面板" hidden>
+  <div class="grabber" aria-hidden="true"></div>
+  <div id="sheetBody"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* =====================================================
+   資料來源：台新銀行 Richart卡 活動頁（官方）
+   https://mkp.taishinbank.com.tw/s/2025/RichartCard_2025/index.html
+   擷取日期：2026/11/12；用字依官方頁面
+   ===================================================== */
+var SRC='https://mkp.taishinbank.com.tw/s/2025/RichartCard_2025/index.html';
+var FETCHED='2026/11/12';
+var TAICHUNG={lat:24.1477,lng:120.6736,name:'台中'};
+var L=function(s){return s.split('、');};
+var PAY7='實體信用卡(含線上輸入卡號)、台新Pay、Apple Pay、Google 錢包或Samsung Pay綁定消費';
+var P7=['2026-07-01','2027-12-31'];
+
+var HOTELS='台北晶華酒店、礁溪晶泉丰旅、北投晶泉丰旅、台南晶英酒店、太魯閣晶英酒店、蘭城晶英酒店、捷絲旅、君品酒店、雲品溫泉酒店、翰品酒店、兆品酒店、品文旅、台北萬豪酒店、高雄萬豪酒店、W HOTEL、台北喜來登大飯店、台北士林萬麗酒店、台北國泰萬怡酒店、台北六福萬怡酒店、林口亞昕福朋喜來登酒店、八里福朋喜來登酒店、桃園喜來登酒店、新竹豐邑喜來登大飯店、宜蘭礁溪福朋喜來登酒店、台東桂田喜來登酒店、澎湖福朋喜來登酒店、然一酒店、台北寒舍艾美酒店、台北賦樂旅居、台北宿之酒店．臻品之選、台北中山雅樂軒酒店、台北北投雅樂軒酒店、台南安平雅樂軒酒店、桃園大溪笠復威斯汀度假酒店、宜蘭力麗威斯汀度假酒店、台中李方艾美酒店、台中萬楓酒店、台中豐邑MOXY酒店、花蓮潔西艾美酒店、煙波花蓮太魯閣、煙波新竹湖濱館、煙波新竹都會館、煙波花蓮館、煙波蘇澳四季雙泉館、煙波宜蘭館、煙波台南館、煙波花時間 宜蘭傳藝、煙波花時間 花蓮、礁溪老爺酒店、知本老爺酒店、新竹老爺酒店、北投老爺酒店、台北老爺酒店、台南老爺行旅、台中大毅老爺行旅、南港老爺行旅、老爺會館台北南西、老爺會館台北林森、台北福華大飯店、石門水庫福華渡假飯店、新竹福華大飯店、台中福華大飯店、溪頭福華渡假飯店、雲林華安大飯店、高雄福華大飯店、墾丁福華渡假飯店、台北漢來大飯店、高雄漢來大飯店、漢來日月行館、台北君悅酒店、臺中勤美洲際酒店、高雄洲際酒店、礁溪寒沐酒店';
+
+var PLANS=[
+{id:'chill',name:'Chill刷',max:10,range:'3.3%–10%',period:['2026-07-08','2026-12-31'],
+ g:'linear-gradient(135deg,#4F23B8 0%,#A63CD3 50%,#FF79B0 100%)',
+ tagline:'瘋聚會、沉浸娛樂、獨自升級',
+ pay:'實體卡、LINE Pay、台新Pay、Apple Pay、Google 錢包或Samsung Pay綁定消費',
+ groups:[
+  {t:'瘋聚會｜歡聚微醺',r:10,c:'party',items:L('詹記麻辣火鍋、萬客什鍋、海底撈、屋馬燒肉、茶六燒肉堂、新村站著吃、燒肉政宗、碳佐麻里、雞湯大叔、gonna共樂遊、BRUN 不然、CAFE ACME、The Antipodean、貳樓、樂子 the Diner、Fake Sober、Draft Land、臺虎精釀(含啜飲室)、ABV系列、Bar TCRC、Bar Home、Phowa、MOONROCK、台灣代駕(10/1起新增)、Motodomo 愛車管家(10/1起新增)')},
+  {t:'瘋聚會｜日常續命',r:10,c:'drink',items:L('50嵐、得正、五桐號、龜記、UG TEA、叮哥茶飲、CAFE!N、%Arabica、COMPOSE COFFEE')},
+  {t:'瘋聚會｜約會犒賞',r:5,c:'dine',items:L('饗饗 INPARADISE、NAGOMI')},
+  {t:'沉浸娛樂｜應援追星',r:5,c:'ent',items:L('WEVERSE、K-MONSTAR、微樂客、五大唱片、仙女樹、FANME、NOL')},
+  {t:'沉浸娛樂｜熬夜追更',r:5,c:'media',items:L('巴哈姆特、BOOK WALKER、Animate、樂天KOBO、Readmoo讀墨、Netflix、Disney+、愛爾達')},
+  {t:'沉浸娛樂｜數位外掛',r:5,c:'shop',items:L('Pinkoi(10/1起新增)')},
+  {t:'沉浸娛樂｜數位外掛',r:3.3,c:'shop',items:L('Apple 直營(含官網)、Studio A(含Straight A)、DJI、Insta360、GoPro、蝦皮、淘寶、酷澎、Uber Eats')},
+  {t:'獨自升級｜營養補給',r:5,c:'health',items:L('好好生醫、POPCARE好在乎、營養師輕食、VITABOX、MYPROTEIN、UrMart優馬選品')},
+  {t:'獨自升級｜體態養成',r:5,c:'sport',items:L('Anytime Fitness、健身工廠、World Gym、超核心 Hypercore、KX PILATES、虎鐵健身 X 器械皮拉提斯、17FIT')},
+  {t:'獨自升級｜運動品牌',r:5,c:'fashion',items:L('Adidas、New Balance、PUMA、Onitsuka Tiger、Nike、HOKA、Salomon、lululemon')}
+ ],
+ notes:[
+  {h:'Chill刷',t:'指定通路限獨立店或線上官網享最高3.3% - 10%加碼回饋，若透過Uber Eats或指定網購平台(如蝦皮)之消費，享最高3.3%加碼回饋。'},
+  {h:'Chill刷',t:'若透過其他百貨、外送平台、網購平台(如momo)、商場(如大全聯)、飯店等產生之消費，不予加碼回饋。'},
+  {h:'Chill刷',t:'切換「Chill刷」並以實體卡、LINE Pay、台新Pay、Apple Pay、Google 錢包或Samsung Pay綁定消費，享加碼回饋。各品牌通路加碼回饋須以有提供信用卡或LINE Pay付款門市為主，若無提供上述付款方式之門市，恕無法提供回饋。'},
+  {h:'Chill刷-Samsung',t:'Samsung適用通路：限三星商城、三星街邊店（三星智慧館），不含百貨店。'}
+ ]},
+
+{id:'pay',name:'Pay著刷',max:3.8,range:'3.8% 或 2.3%',period:P7,
+ g:'linear-gradient(135deg,#0B5D57 0%,#12A190 55%,#6FE3CF 100%)',
+ tagline:'台新Pay及台新Pay+綁定支付享加碼；LINE Pay及全盈+Pay綁定支付享加碼',
+ pay:'台新Pay、台新Pay+（3.8%）；LINE Pay、全盈+Pay（2.3%）',
+ groups:[
+  {t:'台新Pay',r:3.8,c:'pay',extra:'台新Pay｜全家、7-11、新光三越、Richart Mart、康是美、IKEA、NET 等，詳見台新Pay官網',cond:'台新Pay綁定支付',items:L('全家、7-11、新光三越、Richart Mart、康是美、IKEA、NET')},
+  {t:'台新Pay(TWQR、台灣Pay)',r:3.8,c:'pay',extra:'神腦、燦坤、全國電子、麥當勞、美廉社、大樹藥局等，詳見台灣Pay場域',cond:'台新Pay綁定支付',items:L('神腦、燦坤、全國電子、麥當勞、美廉社、大樹藥局')},
+  {t:'台新Pay+',r:3.8,c:'travel',extra:'日韓交易再享免1.5%國外交易手續費，含日本LAWSON、BicCamera；韓國GS25、DAISO等，詳見台新Pay+官網',cond:'台新Pay+綁定支付',items:L('日本LAWSON、BicCamera、韓國GS25、DAISO')},
+  {t:'LINE Pay 及 全盈+Pay(7/8起新增)綁定支付',r:2.3,c:'pay',items:L('LINE Pay、全盈+Pay')}
+ ],
+ notes:[
+  {h:'台新Pay',t:'超商使用台新Pay綁定支付，單筆限額最高 NT3,000元。超商代收/售(如水/電/瓦斯、綜所稅、地方稅等)、禮物卡、儲值交易，不予回饋。'},
+  {h:'台新Pay',t:'大全聯及全聯福利中心消費(包含線上購物)，不予回饋。'},
+  {h:'LINE Pay 及 全盈+Pay',t:'限交易地為臺灣且交易幣別為新臺幣之交易享加碼回饋，適用通路依LINE Pay及全盈+Pay公告為準。'},
+  {h:'LINE Pay 及 全盈+Pay',t:'一般消費如屬不回饋項目(詳參專屬網頁說明)將不提供回饋，如四大超商、繳稅費等。'}
+ ]},
+
+{id:'daily',name:'天天刷',max:3.3,range:'3.3%',period:P7,
+ g:'linear-gradient(135deg,#14532D 0%,#1F9D55 55%,#A3E35F 100%)',
+ tagline:'日常採買、通勤交通、加油充電、藥妝藥局',
+ pay:PAY7,
+ groups:[
+  {t:'日常採買',r:3.3,c:'mart',items:L('全家、7-11、萬家福、樂家康、大買家、唐吉訶德、LOPIA、智生活(7/8起新增)'),tags:{'全家':'兩大超商限台新Pay','7-11':'兩大超商限台新Pay'}},
+  {t:'通勤交通',r:3.3,c:'transit',items:L('臺鐵、高鐵、台灣大車隊、LINEGO、Yoxi、Uber、台灣Bolt'),tags:{'Uber':'限交易地為臺灣且交易幣別為新臺幣','台灣Bolt':'限交易地為臺灣且交易幣別為新臺幣'}},
+  {t:'加油充電',r:3.3,c:'fuel',items:L('中油直營、全國加油、全國特急電、源點EVOASIS、華城電能EVALUE、USPACE、Autopass(車麻吉)'),tags:{'USPACE':'係指停車費'}},
+  {t:'藥妝藥局',r:3.3,c:'health',items:L('寶雅、康是美、屈臣氏、杏一醫療、大樹藥局、丁丁藥局、佑全保健藥妝、健康人生藥局')}
+ ],
+ notes:[
+  {h:'全家、7-11',t:'限綁定台新Pay支付享回饋，使用實體卡、OPEN錢包、全盈支付、Famipay等行動支付不予回饋。'},
+  {h:'全家、7-11',t:'超商代收/售(如水/電/瓦斯、綜所稅、地方稅等)、禮物卡、儲值交易、菸品，不予回饋。'},
+  {h:'全家、7-11',t:'超商綁定台新Pay支付，單筆限額最高 NT3,000元。'},
+  {h:'萬家福、樂家康',t:'將以信用卡簽單名稱判斷是否符合萬家福、樂家康之交易(包含線上網購/超市)，美食街、商店街將不予加碼回饋。'},
+  {h:'大買家',t:'將以信用卡簽單名稱判斷是否符合大買家之交易(包含線上網購)，美食街、商店街將不予加碼回饋。'},
+  {h:'臺鐵、高鐵',t:'限透過高鐵網路訂票系統/臺鐵官網、台灣高鐵行動購票APP/臺鐵e訂通、高鐵各車站與臺鐵臨櫃售票窗口及自動售票機成功購票者，享加碼回饋。使用儲值卡（如悠遊卡）及TR-PASS等其他購票通路及乘車方式，不予加碼回饋。'},
+  {h:'臺鐵、高鐵',t:'將以交易之「消費日」當日留存於台新銀行最終回饋方案計算回饋，非乘車日。'},
+  {h:'台灣大車隊',t:'於車上以實體卡刷卡、或於台灣大車隊APP綁定本卡之交易，享加碼回饋。'},
+  {h:'Uber、台灣Bolt',t:'限交易地為臺灣且交易幣別為新臺幣之交易享加碼回饋。若交易地非臺灣或交易幣別非新臺幣，則不符合天天刷加碼回饋。'},
+  {h:'LINEGO',t:'若切換「天天刷」並以實體卡、LINE Pay、Apple Pay、Google 錢包或Samsung Pay綁定消費，享加碼回饋資格。'},
+  {h:'USPACE',t:'USPACE係指停車費，不含USPACE App其他服務，以USPACE官網公告為準。'},
+  {h:'嘟嘟房',t:'綁定iParking App支付，不予加碼回饋。'},
+  {h:'唐吉訶德、LOPIA',t:'本活動僅限於台灣地區之門市消費，不含附屬餐廳之消費，如「肉割烹-黑泉」等。'},
+  {h:'唐吉訶德、LOPIA',t:'本活動不適用於：會員換購、菸類商品、代收代售消費、藥局藥品、嬰幼兒奶粉與配方食品、團購商品之消費金額。'},
+  {h:'藥妝藥局',t:'藥品、1歲以下嬰幼兒奶粉、醫療器材、佑全線上購及使用悠遊卡或其他App綁定信用卡儲值加值交易之消費金額不列入消費回饋計算。'},
+  {h:'藥妝藥局',t:'寶雅、康是美、屈臣氏 含實體門市及線上(不含透過蝦皮、樂天市場等消費)；屈臣氏僅限臺灣地區消費'},
+  {h:'藥妝藥局',t:'藥局僅適用於一般實體門市 (便利商店/量販店複合門市/機場店除外)。'},
+  {h:'智生活',t:'限智生活App或智樂家官網訂購到府生活服務(如洗冷氣、包裹寄送、送洗衣物等)之消費享加碼回饋；若透過財金平台之消費(如社區管理費繳納、生活便利通之線上繳費(如停車費、 電信費等))，因屬不回饋項目，將不提供回饋。'}
+ ]},
+
+{id:'big',name:'大筆刷',max:3.3,range:'3.3%',period:P7,
+ g:'linear-gradient(135deg,#5A0C25 0%,#A81F45 55%,#EE6A7E 100%)',
+ tagline:'指定百貨、指定Outlet、居家裝修、時尚品味',
+ pay:PAY7,
+ groups:[
+  {t:'指定百貨',r:3.3,c:'dept',items:L('新光三越(含skm pay)、遠東百貨、遠東SOGO、漢神巨蛋、漢神百貨、漢神洲際、微風、台北101、遠東巨城、廣三SOGO、南紡購物中心、誠品生活(含線上)、京站、三創生活、夢時代、統一時代(含DREAM PLAZA)、中友百貨、Mitsui Shopping Park LaLaport(南港/台中)')},
+  {t:'指定Outlet',r:3.3,c:'dept',items:L('MITSUI OUTLET PARK (林口/台中港/台南)、華泰名品城、SKM Park Outlets')},
+  {t:'居家裝修',r:3.3,c:'home',items:L('IKEA、特力屋、HOLA、宜得利、瑪黑家居')},
+  {t:'時尚品味',r:3.3,c:'fashion',items:L('UNIQLO、GU、ZARA、NET、lululemon')}
+ ],
+ notes:[
+  {h:'指定百貨/outlet',t:'百貨交易將以信用卡簽單之商店名稱或Richart Life App消費資訊判斷是否為該百貨之交易(含部分百貨美食街/餐廳)。百貨店中店不予加碼回饋，如Apple直營店，其刷卡簽單上顯示之商店名稱非百貨，不符合大筆刷加碼回饋。'},
+  {h:'指定百貨/outlet',t:'除注意事項第三-1-(3)點排除之支付工具外，使用百貨支付工具(如101 Pay、微風錢包等)消費，亦不予加碼回饋(skm pay不在此限)。'},
+  {h:'指定百貨/outlet',t:'微風僅微風廣場、微風南京、微風松高、微風信義、微風南山之消費享加碼回饋。微風台大醫院、TRINE & ZEN(微風中研院店)、微風東岸(EAST COAST BY BREEZE)不予加碼回饋。'},
+  {h:'指定百貨/outlet',t:'誠品生活認列之消費不包含誠品書店之消費。'},
+  {h:'指定百貨/outlet',t:'新光三越台北車站消費不予加碼回饋。'},
+  {h:'居家裝修',t:'含線上購物官網，不含蝦皮等電商平台消費。'},
+  {h:'時尚品味',t:'線上限臺灣官方網站'},
+  {h:'時尚品味',t:'實體通路將以信用卡簽單之商店名稱判斷是否為該品牌之交易，百貨店中店不予加碼回饋，如UNIQLO或ZARA，其刷卡簽單上顯示之非商店或指定百貨名稱，不符合大筆刷加碼回饋。'}
+ ]},
+
+{id:'dine',name:'好饗刷',max:3.3,range:'3.3%',period:P7,
+ g:'linear-gradient(135deg,#8A2C0B 0%,#E0590F 52%,#FBC03C 100%)',
+ tagline:'全臺餐飲、外送平台、購票娛樂、指定KTV、指定飯店',
+ pay:PAY7,
+ groups:[
+  {t:'全臺餐飲',r:3.3,c:'dine',items:L('全臺餐飲(不含餐券)、王品瘋Pay')},
+  {t:'外送平台',r:3.3,c:'dine',items:L('Uber Eats、Foodpanda'),tags:{'Uber Eats':'限交易地為臺灣且交易幣別為新臺幣','Foodpanda':'限交易地為臺灣且交易幣別為新臺幣'}},
+  {t:'購票娛樂',r:3.3,c:'ent',items:L('拓元售票、KKTIX、年代售票、寬宏售票、OPENTIX兩廳院文化生活、FunNow')},
+  {t:'指定KTV',r:3.3,c:'ent',items:L('錢櫃、好樂迪、ONCOR、sing!go、享溫馨')},
+  {t:'指定飯店',r:3.3,c:'hotel',extra:'指定飯店不含餐券、住宿券等票券',items:L(HOTELS)}
+ ],
+ notes:[
+  {h:'全臺餐飲',t:'限交易地為臺灣且該指定通路收單機構設定行業類別為餐廳之交易享加碼回饋。餐廳回饋係以刷卡簽單上之特約商店名稱認定，請依刷卡簽單或Richart Life App消費資訊中查看為準，非以發票上列示之商家名稱為依據。若該指定通路於收單機構登記之行業類別，非餐廳則不符合好饗刷加碼回饋。(*餐廳MCC code代碼為5811、5812、5813、5814)。'},
+  {h:'全臺餐飲',t:'透過財團法人聯合信用卡中心小額支付平台收費之餐廳，如連鎖飲料店(如水巷茶弄等)、連鎖速食店(如麥當勞、肯德基等)，不予回饋。'},
+  {h:'全臺餐飲',t:'透過菸酒交易、酒吧、KTV、酒店、飯店、百貨、商場(如大全聯)、外送平台產生之餐廳消費，不予加碼回饋。'},
+  {h:'全臺餐飲',t:'本活動回饋不包含購買餐券。'},
+  {h:'外送平台',t:'限交易地為臺灣且交易幣別為新臺幣之交易享加碼回饋。若交易地非臺灣或交易幣別非新臺幣，則不符合好饗刷加碼回饋。'},
+  {h:'指定飯店',t:'本活動回饋不包含購買餐券、住宿券等票券及代訂服務或相關精品商店等。'}
+ ]},
+
+{id:'fun',name:'數趣刷',max:3.3,range:'3.3%',period:P7,
+ g:'linear-gradient(135deg,#1B1766 0%,#4B44E0 52%,#2CD4EC 100%)',
+ tagline:'網購平台、線上課程、遊戲影音、AI服務',
+ pay:PAY7,
+ groups:[
+  {t:'網購平台',r:3.3,c:'shop',items:L('蝦皮、momo、酷澎(Coupang)、PChome、淘寶、Amazon、東森、博客來、Richart Mart、PayEasy、iHerb、SHEIN、Farfetch、Olive Young'),tags:{'蝦皮':'限交易地為臺灣且交易幣別為新臺幣'}},
+  {t:'線上課程',r:3.3,c:'edu',items:L('知識衛星、Amazing Talker、Tutor ABC、Hahow、PressPlay')},
+  {t:'遊戲影音',r:3.3,c:'media',items:L('MyCard、遊戲橘子、Steam、PlayStation、Nintendo、Netflix、Disney+')},
+  {t:'AI服務',r:3.3,c:'ai',items:L('ChatGPT、Notion、Canva、Perplexity、Claude')}
+ ],
+ notes:[
+  {h:'網購平台',t:'本活動回饋不包含購買黃金等貴金屬、遊戲點數、票券及點數類商品等消費，亦不包含使用任何平台代扣繳費、購買廣告等。'},
+  {h:'網購平台',t:'「蝦皮」限交易地為臺灣且交易幣別為新臺幣之交易享加碼回饋，若交易地非臺灣或交易幣別非新臺幣，則不符合數趣刷加碼回饋。'},
+  {h:'PChome',t:'PChome 24h購物各通路含線上購物、24h購物、手機APP、PChome 24h書店，不含支付連PChomePay、海外代購及PChome旅遊，亦不包含使用任何平台代扣繳費、購買廣告等。'},
+  {h:'PChome',t:'一般商品建議與排除商品(PChome儲值及電子票券)分開購物車結帳，以確保消費能獲得「數趣刷」權益方案指定消費回饋。'},
+  {h:'遊戲影音、AI服務',t:'若係透過Google服務消費，將於每季結算後，於次2個月底前統一回饋至正卡人信用卡帳戶，實際回饋時間依台新銀行作業時間為準。'}
+ ]},
+
+{id:'travel',name:'玩旅刷',max:3.3,range:'3.3%',period:P7,
+ g:'linear-gradient(135deg,#0A2F66 0%,#1A6FD4 52%,#7CCFFA 100%)',
+ tagline:'海外消費、航空公司、海外交通/網路、訂房平台、旅行社',
+ pay:PAY7,
+ groups:[
+  {t:'海外消費(含實體及線上、歐洲國家交易)',r:3.3,c:'travel',items:['海外消費']},
+  {t:'航空公司',r:3.3,c:'travel',items:L('中華航空、長榮航空、星宇航空、台灣虎航、國泰航空、華信航空、立榮航空、樂桃航空、阿聯酋航空、亞洲航空、酷航、捷星航空、新加坡航空、日本航空、越捷航空')},
+  {t:'海外交通/網路',r:3.3,c:'travel',items:L('Uber、Grab、SUICA、ICOCA、PASMO、WOWPASS、AIRSIM'),tags:{'Uber':'限交易地非臺灣或交易幣別非新臺幣'}},
+  {t:'訂房平台',r:3.3,c:'travel',items:L('Klook、KKday、Agoda、Booking.com、Trip.com、Airbnb、Hotels.com、Expedia')},
+  {t:'旅行社',r:3.3,c:'travel',items:L('雄獅旅遊、易遊網、東南旅遊、可樂旅遊、長汎假期、五福旅遊、喜鴻假期、易飛旅遊、燦星旅遊、加利利旅行社、鳳凰國際旅行社、山富旅遊、行健旅遊')}
+ ],
+ notes:[
+  {h:'海外消費',t:'海外消費指交易幣別為外幣，或交易國別非臺灣(實際依商家拋送資訊為準)。舉例 : 如以新臺幣結帳，且商家拋送之國別為臺灣，則該筆交易屬國內消費。'},
+  {h:'海外消費',t:'實際計算匯率以信用卡國際組織公告為準。'},
+  {h:'航空公司',t:'航空公司定義：限透過中華航空、長榮航空、星宇航空、台灣虎航、國泰航空 、華信航空、立榮航空、樂桃航空、阿聯酋航空、亞洲航空、酷航、捷星航空、新加坡航空、日本航空、越捷航空公司實體或官網購買機票之消費。若透過第三方訂票平台購買機票，恕無法認列活動消費。'},
+  {h:'訂房旅行',t:'僅指定訂房平台之交易享加碼回饋。若於訂房平台選擇到店付款，實際收單特店為飯店或民宿者，不符合玩旅刷指定消費之加碼回饋。'},
+  {h:'旅行社',t:'限於指定旅行社直營通路(含官網)，以本卡消費之交易享加碼回饋，加盟店或代銷平台之消費，不予加碼回饋。'},
+  {h:'AIRSIM',t:'限於AIRSIM官網、AIRSIM ROAM APP訂購，且帳單明細之商店名稱為AIRSIM，享回饋資格。AIRSIM僅支援台新Richart Mastercard/VISA 卡。'},
+  {h:'Uber',t:'限交易地非臺灣或交易幣別非新臺幣之交易享加碼回饋。'}
+ ]},
+
+{id:'holiday',name:'假日刷',max:2,range:'2%',period:P7,
+ g:'linear-gradient(135deg,#1E2A46 0%,#B85C4F 55%,#F2C98A 100%)',
+ tagline:'國內節假日 不限通路消費',
+ pay:'實體卡、LINE Pay、全盈+Pay、台新Pay、Apple Pay、Google 錢包或Samsung Pay綁定消費',
+ groups:[
+  {t:'節假日不限通路(含保費)消費',r:2,c:'holiday',items:['節假日不限通路消費']},
+  {t:'假日刷｜保費',r:2,c:'ins',items:['線上投保、「手動」刷卡繳保費']}
+ ],
+ notes:[
+  {h:'假日刷',t:'若於假日期間，切換「假日刷」並以實體卡、LINE Pay、全盈+Pay、台新Pay、Apple Pay、Google 錢包或Samsung Pay綁定消費，享加碼2%回饋資格。'},
+  {h:'假日刷',t:'含線上投保、「手動」刷卡繳保費享2%回饋。透過保險公司「自動」扣繳保費(含首期、續期)，不限切換類別，【OO刷】均享保費最高1.3%。'},
+  {h:'假日刷',t:'國內節假日的定義，依行政院人事行政總處公告之國定例假日為準(不含天災假)。'},
+  {h:'假日刷',t:'一般消費如屬不回饋項目(詳參專屬網頁說明)將不提供回饋，如四大超商、繳稅費等。'},
+  {h:'假日刷',t:'臺北捷運「感應支付」將不提供加碼回饋，僅適用一般消費0.3%。'}
+ ]}
+];
+
+/* 免切換常態回饋（不放進錢包，只出現在搜尋） */
+var BASE={id:'base',name:'免切換',fixed:true,max:1.3,period:P7,
+ g:'linear-gradient(135deg,#3B3F4A,#7A808C)',
+ groups:[
+  {t:'保費免切換免領券',r:1.3,c:'ins',extra:'刷台新Richart卡繳保費，一次付清享1.3%台新Point(信用卡)回饋。',items:['保費一次付清']},
+  {t:'一般消費',r:0.3,c:'base',extra:'一般消費享0.3% 台新Point(信用卡)回饋無上限，不回饋項目詳注意事項。',items:['一般消費']}
+ ],
+ notes:[]};
+
+/* 搜尋用別名（只用來比對，不顯示） */
+var ALIAS={'7-11':['統一超商','小七','seven'],'全家':['familymart'],'萬家福':['家樂福','carrefour'],'樂家康':['家樂福','carrefour'],
+ '臺鐵':['火車'],'中華航空':['華航'],'台灣虎航':['虎航'],'Foodpanda':['熊貓'],'Uber Eats':['ubereats']};
+
+var CATS=[['all','全部'],['party','聚會微醺'],['drink','手搖咖啡'],['dine','餐飲外送'],['mart','超商量販'],['transit','交通'],['fuel','加油充電'],
+ ['health','藥妝保健'],['sport','健身'],['dept','百貨Outlet'],['home','居家'],['fashion','服飾運動'],['ent','娛樂購票'],['hotel','飯店'],
+ ['shop','網購'],['edu','線上課程'],['media','影音遊戲'],['ai','AI服務'],['travel','海外旅遊'],['pay','行動支付'],['holiday','假日'],['ins','保費']];
+
+/* ---------- 線條圖示 ---------- */
+var IC={
+ all:'<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+ party:'<path d="M7 3h10l-1.2 6.5a3.8 3.8 0 0 1-7.6 0z"/><path d="M12 13.5V21M8.5 21h7M7.6 6.5h8.8"/>',
+ drink:'<path d="M6.5 8h11l-1.3 12.2a1 1 0 0 1-1 .8H8.8a1 1 0 0 1-1-.8z"/><path d="M5.5 8h13M13 8l2.2-5"/>',
+ dine:'<path d="M7 3v7a2 2 0 0 0 2 2v9M11 3v7a2 2 0 0 1-2 2M9 3v6"/><path d="M17 21V3c-2 1.5-3 4-3 7v3h3"/>',
+ mart:'<path d="M3 4h2.2l2.3 11h10.3L20 7.5H6.2"/><circle cx="9.5" cy="19" r="1.3"/><circle cx="16.5" cy="19" r="1.3"/>',
+ transit:'<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 10h14M9 13.5h.01M15 13.5h.01M8.5 21l2-4M15.5 21l-2-4"/>',
+ fuel:'<path d="M4 21V5.5A2.5 2.5 0 0 1 6.5 3h5A2.5 2.5 0 0 1 14 5.5V21M3 21h12M6.5 9h5"/><path d="M14 10h1.8a1.7 1.7 0 0 1 1.7 1.7v4.1a1.5 1.5 0 0 0 3 0V8.5L18 6"/>',
+ health:'<path d="M9.5 3.5h5v6h6v5h-6v6h-5v-6h-6v-5h6z"/>',
+ sport:'<path d="M6.5 7.5v9M3.5 10v4M17.5 7.5v9M20.5 10v4M6.5 12h11"/>',
+ dept:'<path d="M5 8h14l-1 13H6z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
+ home:'<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/>',
+ fashion:'<path d="M8.5 3.5 3.5 6.5l2 4.5 2.5-1V20.5h8V10l2.5 1 2-4.5-5-3a3.5 3.5 0 0 1-7 0z"/>',
+ ent:'<path d="M4 6.5h16V10a2 2 0 0 0 0 4v3.5H4V14a2 2 0 0 0 0-4z"/><path d="M14.5 6.5v11" stroke-dasharray="1.6 1.8"/>',
+ hotel:'<path d="M3 19V6M3 15h18v4M21 15v-2.5a3 3 0 0 0-3-3h-7.5V15"/><circle cx="6.8" cy="11.8" r="1.6"/>',
+ shop:'<path d="M3.5 7.5 12 3.5l8.5 4-8.5 4z"/><path d="M3.5 7.5v9l8.5 4 8.5-4v-9M12 11.5v9"/>',
+ edu:'<path d="m2.5 9 9.5-4.5L21.5 9 12 13.5z"/><path d="M6.5 11v4.8c3 2 8 2 11 0V11M21.5 9v5"/>',
+ media:'<rect x="3.5" y="5" width="17" height="12" rx="2"/><path d="m10.5 8.5 4.5 2.5-4.5 2.5zM8 20.5h8"/>',
+ ai:'<path d="M11 3.5 12.8 8.7 18 10.5l-5.2 1.8L11 17.5l-1.8-5.2L4 10.5l5.2-1.8z"/><path d="m18.5 15 .7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+ travel:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.8 2.6 2.8 14.4 0 17M12 3.5c-2.8 2.6-2.8 14.4 0 17"/>',
+ pay:'<rect x="6.5" y="2.5" width="11" height="19" rx="2"/><path d="M10.5 18.5h3"/>',
+ holiday:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8.5 3v4M15.5 3v4M12 13.2l.9 1.8 2 .3-1.4 1.4.3 2-1.8-1-1.8 1 .3-2-1.4-1.4 2-.3z"/>',
+ ins:'<path d="M12 3 19.5 6v5.5c0 4.8-3.3 7.9-7.5 9-4.2-1.1-7.5-4.2-7.5-9V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+ base:'<circle cx="12" cy="12" r="8"/>',
+ home2:'<path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.8V20h12V9.8"/>',
+ search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.3-4.3"/>',
+ wallet:'<path d="M4 7.5h15.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 7.5 15 4l1.2 3.5M16.5 14h.01"/>',
+ star:'<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+ sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4"/><circle cx="15" cy="7" r="0"/>',
+ close:'<path d="M6 6l12 12M18 6 6 18"/>',
+ check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ crown:'<path d="m3.5 8 4 3.5L12 5l4.5 6.5 4-3.5-1.8 10.5H5.3z"/>',
+ nfc:'<path d="M8.5 8a5.5 5.5 0 0 1 0 8M11.8 5.5a9 9 0 0 1 0 13M15.2 3a12.5 12.5 0 0 1 0 18M5.4 10.4a2.3 2.3 0 0 1 0 3.2"/>'
+};
+function icon(n,cls){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'+(cls?' class="'+cls+'"':'')+'>'+(IC[n]||'')+'</svg>';}
+function starIcon(on){return '<svg viewBox="0 0 24 24" fill="'+(on?'currentColor':'none')+'" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">'+IC.star+'</svg>';}
+
+/* ---------- 本機儲存 ---------- */
+var store={
+ get:function(k,d){try{var v=localStorage.getItem('rc.'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
+ set:function(k,v){try{localStorage.setItem('rc.'+k,JSON.stringify(v));}catch(e){}}
+};
+var state={
+ theme:store.get('theme','auto'), level:store.get('level',2), main:store.get('main',null), favs:store.get('favs',[]),
+ geo:store.get('geo',null), tab:'home', q:'', cat:'all', open:null, flip:false
+};
+var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- 工具 ---------- */
+function $(s,r){return (r||document).querySelector(s);}
+function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function norm(s){return String(s).toLowerCase().replace(/臺/g,'台').replace(/[\s\-–・·．.()（）]/g,'');}
+function fmt(n){return (Math.round(n*10)/10).toString();}
+function plan(id){if(id==='base')return BASE;for(var i=0;i<PLANS.length;i++)if(PLANS[i].id===id)return PLANS[i];return null;}
+function rateOf(p,r){return (p.fixed||state.level===2)?r:1.3;}
+function maxOf(p){return state.level===2?p.max:1.3;}
+function parseD(s){var a=s.split('-');return new Date(+a[0],+a[1]-1,+a[2]);}
+function dstr(s){var d=parseD(s);return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();}
+function hl(text,q){
+  var t=esc(text); if(!q) return t;
+  var pat=Array.prototype.map.call(q.trim(),function(ch){
+    if(/[台臺]/.test(ch)) return '[台臺]';
+    if(/\s/.test(ch)) return '\\s*';
+    return esc(ch).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  }).join('');
+  try{return t.replace(new RegExp(pat,'gi'),function(m){return '<mark>'+m+'</mark>';});}catch(e){return t;}
+}
+function status(p){
+  var now=new Date(), s=parseD(p.period[0]), e=parseD(p.period[1]), end=new Date(e.getTime()+864e5);
+  var left=Math.ceil((end-now)/864e5);
+  if(now<s) return {k:'neutral',bar:'',t:'尚未開始',pct:0,left:left};
+  if(now>=end) return {k:'danger',bar:'over',t:'已結束',pct:100,left:0};
+  var pct=Math.max(0,Math.min(100,(now-s)/(end-s)*100));
+  if(left<=60) return {k:'warn',bar:'soon',t:'剩 '+left+' 天',pct:pct,left:left,soon:true};
+  return {k:'ok',bar:'',t:'進行中',pct:pct,left:left};
+}
+function toast(msg){var t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('show');},1800);}
+
+/* ---------- 索引 ---------- */
+var ENTRIES=[];
+PLANS.concat([BASE]).forEach(function(p){
+  p.groups.forEach(function(g){
+    g.items.forEach(function(it){
+      ENTRIES.push({p:p,g:g,item:it,c:g.c,tag:(g.tags&&g.tags[it])||g.cond||'',key:norm(it),gkey:norm(g.t),alias:(ALIAS[it]||[]).map(norm)});
+    });
+  });
+});
+
+/* ---------- 自動主題：日出日落 ---------- */
+function sunEvent(date,lat,lng,rising){
+  var D=Math.PI/180,z=90.833;
+  var y=date.getFullYear(),m=date.getMonth(),d=date.getDate();
+  var N=Math.round((Date.UTC(y,m,d)-Date.UTC(y,0,1))/864e5)+1;
+  var lh=lng/15,t=N+((rising?6:18)-lh)/24;
+  var M=0.9856*t-3.289;
+  var Ls=(M+1.916*Math.sin(M*D)+0.020*Math.sin(2*M*D)+282.634+720)%360;
+  var RA=(Math.atan(0.91764*Math.tan(Ls*D))/D+720)%360;
+  RA=(RA+(Math.floor(Ls/90)*90-Math.floor(RA/90)*90))/15;
+  var sd=0.39782*Math.sin(Ls*D),cd=Math.cos(Math.asin(sd));
+  var cH=(Math.cos(z*D)-sd*Math.sin(lat*D))/(cd*Math.cos(lat*D));
+  if(cH>1||cH<-1) return null;
+  var H=(rising?360-Math.acos(cH)/D:Math.acos(cH)/D)/15;
+  var UT=((H+RA-0.06571*t-6.622-lh)%24+24)%24;
+  var mid=new Date(y,m,d).getTime(), r=Date.UTC(y,m,d)+UT*3600e3;
+  while(r<mid) r+=864e5; while(r>=mid+864e5) r-=864e5;
+  return new Date(r);
+}
+function sunToday(){
+  var loc=state.geo||TAICHUNG,now=new Date();
+  return {rise:sunEvent(now,loc.lat,loc.lng,true),set:sunEvent(now,loc.lat,loc.lng,false),src:state.geo?'目前定位':'台中'};
+}
+function isDay(){var s=sunToday(),n=new Date();if(!s.rise||!s.set){var h=n.getHours();return h>=6&&h<18;}return n>=s.rise&&n<s.set;}
+function hm(d){return d?('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2):'--:--';}
+function resolvedTheme(){return state.theme==='auto'?(isDay()?'light':'dark'):state.theme;}
+function applyTheme(){
+  var t=resolvedTheme();
+  if(document.documentElement.getAttribute('data-theme')!==t) document.documentElement.setAttribute('data-theme',t);
+}
+function requestGeo(force){
+  if(!('geolocation' in navigator)) return;
+  if(!force&&state.geo&&Date.now()-state.geo.t<864e5) return;
+  navigator.geolocation.getCurrentPosition(function(pos){
+    state.geo={lat:pos.coords.latitude,lng:pos.coords.longitude,t:Date.now()};
+    store.set('geo',state.geo);applyTheme();
+    if(sheetMode==='settings') renderSettings();
+  },function(){},{timeout:10000,maximumAge:6*3600e3});
+}
+
+/* ---------- 卡面 ---------- */
+function cardHTML(p,opts){
+  opts=opts||{};
+  var st=status(p),mx=maxOf(p);
+  var sum=p.groups.map(function(g){return g.t;}).filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,5).join('、');
+  var attrs=opts.act?(' role="button" tabindex="0" data-act="'+opts.act+'" data-pid="'+p.id+'" aria-label="'+esc(p.name+(opts.label||''))+'"'):'';
+  return ''+
+  '<div class="card'+(opts.flipped?' flipped':'')+'" style="--g:'+p.g+'"'+attrs+'>'+
+   '<div class="card-inner">'+
+    '<div class="face front">'+
+     '<div class="f-top"><div class="f-name">'+esc(p.name)+'</div>'+
+      '<div class="f-rate"><small>最高</small><span class="n num">'+fmt(mx)+'</span><span class="pct num">%</span></div></div>'+
+     '<div class="f-mid"><span class="emv"></span>'+icon('nfc','nfc')+'</div>'+
+     '<div class="f-bottom"><div class="f-tagline">'+esc(p.tagline)+'</div>'+
+      '<div class="f-brand"><b>Richart</b>台新銀行</div></div>'+
+     '<div class="f-bar '+st.bar+'" title="有效期已過 '+Math.round(st.pct)+'%"><i style="width:'+st.pct.toFixed(1)+'%"></i></div>'+
+    '</div>'+
+    '<div class="face back" aria-hidden="true">'+
+     '<div class="stripe"></div>'+
+     '<div class="sig"><span>'+dstr(p.period[0])+' – '+dstr(p.period[1])+'</span><span class="cvv num">'+fmt(mx)+'%</span></div>'+
+     '<div class="b-sum"><b>分類</b>　'+esc(sum)+'</div>'+
+     '<div class="b-foot"><span class="st '+st.bar+'">'+esc(st.t)+'</span><span>LEVEL '+state.level+'</span></div>'+
+    '</div>'+
+   '</div>'+
+  '</div>';
+}
+
+/* ---------- 類別按鈕 ---------- */
+function renderChips(){
+  $('#chips').innerHTML=CATS.map(function(c){
+    return '<button class="chip" data-act="cat" data-cat="'+c[0]+'" aria-pressed="'+(state.cat===c[0])+'"><span>'+icon(c[0])+esc(c[1])+'</span></button>';
+  }).join('');
+}
+
+/* ---------- 首頁 ---------- */
+function renderHome(){
+  var p=state.main?plan(state.main):null,h='';
+  h+='<h2 class="sec-title">今日主卡<span class="aside">點卡片更換</span></h2>';
+  if(p){
+    var st=status(p);
+    h+=cardHTML(p,{act:'pickmain',label:'，點擊更換今日主卡'});
+    h+='<div class="main-meta"><span>每日23:59前於 Richart Life App 切換，每日限轉換一次</span><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>';
+    h+='<h2 class="sec-title">'+esc(p.name)+' 適用通路</h2><div class="panel vitrine">';
+    p.groups.forEach(function(g){
+      var items=g.items.slice(0,8).join('、')+(g.items.length>8?' 等 '+g.items.length+' 家':'');
+      h+='<div class="g-row"><div class="g-main"><div class="g-t">'+esc(g.t)+'</div><div class="g-i">'+esc(items)+'</div></div><span class="rate-pill num">'+fmt(rateOf(p,g.r))+'<small>%</small></span></div>';
+    });
+    h+='<div class="d-actions"><button class="btn ghost" data-act="viewplan" data-pid="'+p.id+'">查看完整內容與注意事項</button></div></div>';
+  }else{
+    h+='<button class="card-empty" data-act="pickmain"><span>'+icon('plus')+'<b>設定今日主卡</b>選擇今天在 Richart Life App 切換的方案</span></button>';
+  }
+  var soon=PLANS.filter(function(x){var s=status(x);return s.soon||s.k==='danger';});
+  if(soon.length){
+    h+='<h2 class="sec-title">到期提醒</h2><div class="panel">';
+    soon.forEach(function(x){var s=status(x);
+      h+='<button class="alert-row" data-act="viewplan" data-pid="'+x.id+'"><span class="swatch" style="--g:'+x.g+'"></span><span class="a-main"><b>'+esc(x.name)+'</b><div class="a-sub">活動期間至 '+dstr(x.period[1])+'</div></span><span class="tag '+s.k+'">'+esc(s.t)+'</span></button>';
+    });
+    h+='</div>';
+  }
+  h+='<h2 class="sec-title">卡友身分</h2><div class="panel"><button class="alert-row" data-act="settings"><span class="a-main"><b>目前以 LEVEL '+state.level+' 計算</b><div class="a-sub">'+(state.level===2?'有設定台新帳戶扣繳台新信用卡帳款，次期帳單結帳後消費享':'台新Richart卡友 核卡消費即享（切換刷加碼通路最高1.3%）')+'</div></span><span class="tag '+(state.level===2?'ok':'warn')+'">'+(state.level===2?'LEVEL 2':'LEVEL 1')+'</span></button></div>';
+  h+='<p class="src" style="margin-top:14px">資料來源：<a href="'+SRC+'" target="_blank" rel="noopener">台新銀行 Richart卡活動頁</a>（擷取 '+FETCHED+'）</p>';
+  $('#page-home').innerHTML=h;
+}
+
+/* ---------- 搜尋 ---------- */
+function findEntries(){
+  var q=norm(state.q),cat=state.cat;
+  return ENTRIES.filter(function(e){
+    if(cat!=='all'&&e.c!==cat) return false;
+    if(!q) return cat!=='all';
+    if(e.key.indexOf(q)>-1||e.gkey.indexOf(q)>-1) return true;
+    for(var i=0;i<e.alias.length;i++) if(e.alias[i].indexOf(q)>-1) return true;
+    return false;
+  });
+}
+function rowTags(e){
+  var t='';
+  if(e.tag) t+='<span class="tag warn">'+esc(e.tag)+'</span>';
+  var st=status(e.p);
+  if(st.soon) t+='<span class="tag warn">'+esc(st.t)+'</span>';
+  if(st.k==='danger') t+='<span class="tag danger">已結束</span>';
+  return t?'<div class="res-tags">'+t+'</div>':'';
+}
+function renderSearch(){
+  var h='',q=state.q.trim();
+  if(!q&&state.cat==='all'){
+    h+='<h2 class="sec-title">搜尋</h2><div class="panel"><p class="hint">輸入商家名稱，或點上方類別，找出回饋最高的方案。</p><div class="quick">'+
+      ['全家','Uber Eats','蝦皮','海外消費','保費','Netflix','UNIQLO','50嵐'].map(function(k){return '<button data-act="quick" data-q="'+esc(k)+'">'+esc(k)+'</button>';}).join('')+
+      '</div></div>';
+    $('#page-search').innerHTML=h;return;
+  }
+  var rows=findEntries().filter(function(e){return status(e.p).k!=='danger';});
+  var catName='';CATS.forEach(function(c){if(c[0]===state.cat)catName=c[1];});
+  h+='<h2 class="sec-title">'+(q?'「'+esc(q)+'」':'')+(state.cat!=='all'?(q?'・':'')+esc(catName):'')+'<span class="aside">'+rows.length+' 筆</span></h2>';
+  if(state.level===1) h+='<p class="hint" style="margin:-4px 0 10px">目前以 LEVEL 1 計算：切換刷加碼通路最高1.3%</p>';
+  if(!rows.length){
+    h+='<div class="panel empty"><b>找不到符合的商家</b>試試較短的關鍵字，或改用類別篩選。未列出的通路以一般消費 0.3% 計算。</div>';
+    $('#page-search').innerHTML=h;return;
+  }
+  rows.forEach(function(e){e.rate=rateOf(e.p,e.g.r);});
+  rows.sort(function(a,b){return b.rate-a.rate||PLANS.indexOf(a.p)-PLANS.indexOf(b.p);});
+  /* 最佳選擇 */
+  var top=rows[0].rate,best={},order=[];
+  rows.forEach(function(e){if(e.rate===top){if(!best[e.p.id]){best[e.p.id]=[];order.push(e.p.id);}if(best[e.p.id].indexOf(e.item)<0)best[e.p.id].push(e.item);}});
+  h+='<div class="panel vitrine best"><div class="best-label">'+icon('crown')+'最佳選擇</div>';
+  order.slice(0,4).forEach(function(pid){
+    var p=plan(pid),its=best[pid];
+    h+='<div class="best-row"><span class="swatch" style="--g:'+p.g+'"></span><div class="best-main"><div class="best-plan">'+esc(p.fixed?'免切換':p.name)+'</div><div class="best-items">'+its.slice(0,6).map(function(x){return hl(x,q);}).join('、')+(its.length>6?' 等 '+its.length+' 家':'')+'</div></div><div class="best-rate num">'+fmt(top)+'<small>%</small></div></div>';
+  });
+  h+='</div>';
+  /* 依方案分組 */
+  h+='<h2 class="sec-title">全部結果</h2>';
+  var byPlan={},porder=[];
+  rows.forEach(function(e){if(!byPlan[e.p.id]){byPlan[e.p.id]=[];porder.push(e.p.id);}byPlan[e.p.id].push(e);});
+  porder.forEach(function(pid){
+    var p=plan(pid),st=status(p);
+    h+='<div class="panel"><div class="res-plan-head"><span class="swatch" style="--g:'+p.g+'"></span><b>'+esc(p.fixed?'免切換':p.name)+'</b><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>';
+    byPlan[pid].forEach(function(e){
+      var fav=state.favs.indexOf(e.item)>-1;
+      h+='<div class="res-row"><div class="res-main"><div class="res-name">'+hl(e.item,q)+'</div><div class="res-sub">'+hl(e.g.t,q)+'</div>'+rowTags(e)+'</div>'+
+         '<span class="rate-pill num">'+fmt(e.rate)+'<small>%</small></span>'+
+         '<button class="star" data-act="fav" data-item="'+esc(e.item)+'" aria-pressed="'+fav+'" aria-label="收藏 '+esc(e.item)+'">'+starIcon(fav)+'</button></div>';
+    });
+    h+='</div>';
+  });
+  if(q&&!rows.some(function(e){return e.p.id==='holiday';})){
+    h+='<div class="panel" style="margin-top:10px"><div class="res-plan-head"><span class="swatch" style="--g:'+plan('holiday').g+'"></span><b>假日刷</b><span class="rate-pill num">'+fmt(rateOf(plan('holiday'),2))+'<small>%</small></span></div><p class="hint">節假日不限通路(含保費)消費享2% (含LINE Pay及全盈+Pay綁定)</p></div>';
+  }
+  $('#page-search').innerHTML=h;
+}
+
+/* ---------- 錢包 ---------- */
+function detailHTML(p){
+  var st=status(p),h='<div class="detail panel vitrine">';
+  h+='<dl class="d-meta"><dt>活動期間</dt><dd>'+dstr(p.period[0])+' – '+dstr(p.period[1])+'　<span class="tag '+st.k+'">'+esc(st.t)+'</span></dd>'+
+     '<dt>回饋</dt><dd>'+(state.level===2?'LEVEL 2：'+esc(p.range):'LEVEL 1：1.3%')+'</dd>'+
+     '<dt>支付方式</dt><dd>'+esc(p.pay)+'</dd></dl>';
+  p.groups.forEach(function(g){
+    h+='<div class="d-group"><div class="d-gh"><span class="d-gt">'+esc(g.t)+'</span><span class="rate-pill num">'+fmt(rateOf(p,g.r))+'<small>%</small></span></div>'+
+      (g.extra?'<div class="d-extra">'+esc(g.extra)+'</div>':'')+
+      '<div class="d-items">'+g.items.map(function(i){return '<span>'+esc(i)+((g.tags&&g.tags[i])?'＊':'')+'</span>';}).join('')+'</div>'+
+      (g.tags?'<div class="d-extra" style="margin-top:6px">'+Object.keys(g.tags).map(function(k){return '＊'+esc(k)+'：'+esc(g.tags[k]);}).join('<br>')+'</div>':'')+
+      '</div>';
+  });
+  if(p.notes.length){
+    h+='<details class="notes"><summary>注意事項（'+p.notes.length+'）</summary><ul>'+p.notes.map(function(n){return '<li><b>'+esc(n.h)+'</b>'+esc(n.t)+'</li>';}).join('')+'</ul></details>';
+  }
+  h+='<div class="d-actions"><button class="btn" data-act="setmain" data-pid="'+p.id+'">'+(state.main===p.id?'已是今日主卡':'設為今日主卡')+'</button>'+
+     '<span class="src">資料來源：<a href="'+SRC+'" target="_blank" rel="noopener">台新銀行官網</a></span></div></div>';
+  return h;
+}
+var stackRO=null;
+function renderWallet(){
+  var h='<h2 class="sec-title">權益方案<span class="aside">8 張・點卡展開，再點翻面</span></h2><div class="stack" id="stack">';
+  PLANS.forEach(function(p){
+    var on=state.open===p.id;
+    h+='<div class="slot'+(on?' open':'')+'" data-pid="'+p.id+'">'+cardHTML(p,{act:'wcard',flipped:on&&state.flip,label:on?(state.flip?'，點擊翻回正面':'，點擊翻面查看完整內容'):'，點擊展開'})+
+       '<div class="detail-wrap"'+(on&&state.flip?'':' hidden')+'>'+detailHTML(p)+'</div></div>';
+  });
+  h+='</div><p class="hint" style="margin-top:14px">一般消費享0.3% 台新Point(信用卡)回饋無上限；保費一次付清最高 1.3%（免切換）。</p>';
+  $('#page-wallet').innerHTML=h;
+  var stack=$('#stack');
+  var size=function(){var w=stack.clientWidth;stack.style.setProperty('--cardh',(w/1.586)+'px');stack.style.setProperty('--peek',Math.round(w*0.17)+'px');};
+  size();
+  if(stackRO) stackRO.disconnect();
+  if(window.ResizeObserver){stackRO=new ResizeObserver(size);stackRO.observe(stack);}
+}
+function syncWallet(){
+  $$('#page-wallet .slot').forEach(function(s){
+    var on=s.getAttribute('data-pid')===state.open, card=$('.card',s);
+    s.classList.toggle('open',on);
+    card.classList.toggle('flipped',on&&state.flip);
+    card.setAttribute('aria-label',plan(s.getAttribute('data-pid')).name+(on?(state.flip?'，點擊翻回正面':'，點擊翻面查看完整內容'):'，點擊展開'));
+    $('.detail-wrap',s).hidden=!(on&&state.flip);
+  });
+  var cur=$('#page-wallet .slot[data-pid="'+state.open+'"]');
+  if(cur) setTimeout(function(){cur.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});},reduce?0:120);
+}
+function walletTap(pid){
+  if(state.open!==pid){state.open=pid;state.flip=false;}else{state.flip=!state.flip;}
+  syncWallet();
+}
+
+/* ---------- 收藏 ---------- */
+function renderFavs(){
+  var h='<h2 class="sec-title">收藏<span class="aside">'+state.favs.length+' 家</span></h2>';
+  if(!state.favs.length){
+    h+='<div class="panel empty"><b>還沒有收藏</b>在搜尋結果點星號，把常去的店家收進來，這裡會列出每家最划算的方案。</div>';
+    $('#page-favs').innerHTML=h;return;
+  }
+  state.favs.forEach(function(name){
+    var rows=ENTRIES.filter(function(e){return e.item===name&&status(e.p).k!=='danger';}).map(function(e){return {e:e,r:rateOf(e.p,e.g.r)};});
+    rows.sort(function(a,b){return b.r-a.r;});
+    h+='<div class="panel'+(rows.length?' vitrine':'')+'"><div class="res-row" style="border-top:0;padding-top:0"><div class="res-main"><div class="res-name" style="font-size:16px">'+esc(name)+'</div>'+
+       (rows.length?'<div class="res-sub">最佳：'+esc(rows[0].e.p.fixed?'免切換':rows[0].e.p.name)+'</div>':'<div class="res-sub">目前沒有進行中的方案</div>')+'</div>'+
+       (rows.length?'<span class="rate-pill num">'+fmt(rows[0].r)+'<small>%</small></span>':'')+
+       '<button class="star" data-act="fav" data-item="'+esc(name)+'" aria-pressed="true" aria-label="取消收藏 '+esc(name)+'">'+starIcon(true)+'</button></div>';
+    rows.forEach(function(x){
+      h+='<div class="res-row"><span class="swatch" style="--g:'+x.e.p.g+'"></span><div class="res-main"><div>'+esc(x.e.p.fixed?'免切換':x.e.p.name)+'</div><div class="res-sub">'+esc(x.e.g.t)+'</div>'+rowTags(x.e)+'</div><span class="num" style="font-weight:700">'+fmt(x.r)+'%</span></div>';
+    });
+    h+='</div>';
+  });
+  $('#page-favs').innerHTML=h;
+}
+function toggleFav(name){
+  var i=state.favs.indexOf(name);
+  if(i>-1) state.favs.splice(i,1); else state.favs.push(name);
+  store.set('favs',state.favs);
+  var on=i<0;
+  $$('[data-act="fav"]').forEach(function(b){if(b.getAttribute('data-item')===name){b.setAttribute('aria-pressed',on);b.innerHTML=starIcon(on);}});
+  toast(on?'已收藏「'+name+'」':'已取消收藏');
+  if(state.tab==='favs') renderFavs();
+}
+
+/* ---------- 分頁 ---------- */
+var TABS=[['home','首頁','home2'],['search','搜尋','search'],['wallet','錢包','wallet'],['favs','收藏','star']];
+function renderTabbar(){
+  $('#tabbar').innerHTML=TABS.map(function(t){
+    return '<button class="tab" data-act="tab" data-tab="'+t[0]+'"'+(state.tab===t[0]?' aria-current="page"':'')+'>'+icon(t[2])+'<span>'+t[1]+'</span></button>';
+  }).join('');
+}
+function renderPage(t){({home:renderHome,search:renderSearch,wallet:renderWallet,favs:renderFavs})[t]();}
+function setTab(t,keepScroll){
+  state.tab=t;renderTabbar();
+  TABS.forEach(function(x){$('#page-'+x[0]).hidden=x[0]!==t;});
+  renderPage(t);
+  if(!keepScroll) window.scrollTo(0,0);
+}
+function setQuery(v){
+  state.q=v;$('#q').value=v;$('#btnClear').hidden=!v;
+  if(state.tab!=='search') setTab('search'); else renderSearch();
+}
+function setCat(c){
+  state.cat=(state.cat===c&&c!=='all')?'all':c;renderChips();
+  if(state.tab!=='search') setTab('search'); else {renderSearch();window.scrollTo(0,0);}
+}
+
+/* ---------- 底部面板 ---------- */
+var sheetMode=null,lastFocus=null;
+function openSheet(mode){
+  sheetMode=mode;lastFocus=document.activeElement;
+  if(mode==='settings') renderSettings(); else renderPick();
+  var s=$('#sheet');s.hidden=false;
+  s.setAttribute('aria-label',mode==='settings'?'設定':'選擇今日主卡');
+  requestAnimationFrame(function(){requestAnimationFrame(function(){s.classList.add('open');$('#backdrop').classList.add('open');});});
+  document.body.style.overflow='hidden';
+  setTimeout(function(){var b=$('#sheet [data-act="close"]');if(b)b.focus();},50);
+}
+function closeSheet(){
+  var s=$('#sheet');s.classList.remove('open');$('#backdrop').classList.remove('open');
+  document.body.style.overflow='';sheetMode=null;
+  setTimeout(function(){if(!s.classList.contains('open'))s.hidden=true;},reduce?0:400);
+  if(lastFocus&&lastFocus.focus) lastFocus.focus();
+}
+function sheetHead(title){return '<div class="sheet-head"><h2>'+title+'</h2><button class="icon-btn" data-act="close" aria-label="關閉">'+icon('close')+'</button></div>';}
+function renderSettings(){
+  var s=sunToday(),themes=[['auto','自動','依日出日落切換'],['light','淺色','明亮清爽'],['dark','深色','夜間藍紫光暈'],['luxe','典藏','香檳金與絲絨黑']];
+  var h=sheetHead('設定');
+  h+='<div class="set-group"><div class="set-label">外觀主題</div><div class="theme-grid">'+themes.map(function(t){
+    return '<button class="opt" data-act="theme" data-v="'+t[0]+'" aria-pressed="'+(state.theme===t[0])+'"><span class="pv '+t[0]+'"></span><span><b>'+t[1]+'</b><small>'+t[2]+'</small></span></button>';
+  }).join('')+'</div>';
+  if(state.theme==='auto') h+='<p class="hint" style="margin-top:8px">依'+s.src+'計算：日出 '+hm(s.rise)+'、日落 '+hm(s.set)+'，現在為'+(isDay()?'白天（淺色）':'夜間（深色）')+'</p>';
+  h+='</div>';
+  h+='<div class="set-group"><div class="set-label">卡友身分（影響回饋計算）</div><div class="lvl">'+
+    '<button class="opt" data-act="level" data-v="1" aria-pressed="'+(state.level===1)+'"><span><b>LEVEL 1　1.3%</b><small>台新Richart卡友 核卡消費即享</small></span></button>'+
+    '<button class="opt" data-act="level" data-v="2" aria-pressed="'+(state.level===2)+'"><span><b>LEVEL 2　最高 3.8%（Chill刷 3.3%–10%）</b><small>有設定台新帳戶扣繳台新信用卡帳款 次期帳單結帳後消費享</small></span></button>'+
+    '</div></div>';
+  var mp=state.main?plan(state.main):null;
+  h+='<div class="set-group"><div class="set-label">今日主卡</div><div class="panel" style="padding:4px 12px">'+
+    '<button class="list-btn" data-act="pickmain">'+(mp?'<span class="swatch" style="--g:'+mp.g+'"></span>':'')+'<span class="lb-main"><b>'+(mp?esc(mp.name):'尚未設定')+'</b><div class="lb-sub">點此更換</div></span></button></div></div>';
+  h+='<div class="set-group"><div class="set-label">收藏</div><div class="panel" style="padding:4px 12px">'+
+    '<button class="list-btn" data-act="clearfavs"'+(state.favs.length?'':' disabled')+'><span class="lb-main"><b>清除全部收藏</b><div class="lb-sub">目前 '+state.favs.length+' 家</div></span></button></div></div>';
+  h+='<div class="set-group"><div class="set-label">資料</div><p class="hint">內容依台新銀行 Richart卡活動頁原文整理，擷取日期 '+FETCHED+'。實際回饋以台新銀行公告為準。<br><a href="'+SRC+'" target="_blank" rel="noopener">開啟官方活動頁</a></p></div>';
+  $('#sheetBody').innerHTML=h;
+}
+function renderPick(){
+  var h=sheetHead('選擇今日主卡')+'<p class="hint">選擇今天在 Richart Life App 切換的方案</p><div style="margin-top:8px">';
+  PLANS.forEach(function(p){
+    var on=state.main===p.id;
+    h+='<button class="list-btn" data-act="setmain" data-pid="'+p.id+'" aria-pressed="'+on+'"><span class="swatch" style="--g:'+p.g+'"></span><span class="lb-main"><b>'+esc(p.name)+'</b><div class="lb-sub">'+esc(p.tagline)+'</div></span><span class="num" style="font-weight:700">'+fmt(maxOf(p))+'%</span>'+(on?icon('check','check'):'')+'</button>';
+  });
+  if(state.main) h+='<button class="list-btn" data-act="setmain" data-pid=""><span class="lb-main"><b>清除今日主卡</b></span></button>';
+  $('#sheetBody').innerHTML=h+'</div>';
+}
+
+/* ---------- 事件 ---------- */
+document.addEventListener('click',function(ev){
+  var el=ev.target.closest('[data-act]');if(!el||el.disabled)return;
+  var a=el.getAttribute('data-act'),pid=el.getAttribute('data-pid');
+  switch(a){
+    case 'tab': setTab(el.getAttribute('data-tab'));break;
+    case 'cat': setCat(el.getAttribute('data-cat'));break;
+    case 'quick': setQuery(el.getAttribute('data-q'));break;
+    case 'clearq': setQuery('');$('#q').focus();break;
+    case 'fav': toggleFav(el.getAttribute('data-item'));break;
+    case 'wcard': walletTap(pid);break;
+    case 'pickmain': if(sheetMode==='settings'){sheetMode='pick';renderPick();}else openSheet('pick');break;
+    case 'setmain':
+      state.main=pid||null;store.set('main',state.main);
+      if(sheetMode) closeSheet();
+      toast(pid?'今日主卡：'+plan(pid).name:'已清除今日主卡');
+      renderPage(state.tab);break;
+    case 'viewplan': state.open=pid;state.flip=true;setTab('wallet');setTimeout(syncWallet,30);break;
+    case 'settings': openSheet('settings');break;
+    case 'close': closeSheet();break;
+    case 'theme': state.theme=el.getAttribute('data-v');store.set('theme',state.theme);if(state.theme==='auto')requestGeo(true);applyTheme();renderSettings();break;
+    case 'level': state.level=+el.getAttribute('data-v');store.set('level',state.level);renderSettings();renderPage(state.tab);break;
+    case 'clearfavs': state.favs=[];store.set('favs',[]);renderSettings();toast('已清除收藏');if(state.tab!=='home')renderPage(state.tab);break;
+  }
+});
+document.addEventListener('keydown',function(ev){
+  if(ev.key==='Escape'&&sheetMode){closeSheet();return;}
+  var el=ev.target;
+  if((ev.key==='Enter'||ev.key===' ')&&el.getAttribute&&el.getAttribute('role')==='button'){ev.preventDefault();el.click();}
+});
+var qT=null;
+$('#q').addEventListener('input',function(e){
+  var v=e.target.value;$('#btnClear').hidden=!v;
+  clearTimeout(qT);qT=setTimeout(function(){state.q=v;if(state.tab!=='search')setTab('search');else renderSearch();},120);
+});
+$('#q').addEventListener('keydown',function(e){if(e.key==='Enter')e.target.blur();});
+
+/* ---------- 初始化 ---------- */
+$('#btnSettings').innerHTML=icon('sliders');
+$('#searchIcon').outerHTML=icon('search');
+$('#btnClear').innerHTML=icon('close');
+var header=$('#header');
+function setHeaderH(){document.documentElement.style.setProperty('--header-h',header.offsetHeight+'px');}
+setHeaderH();
+if(window.ResizeObserver) new ResizeObserver(setHeaderH).observe(header); else window.addEventListener('resize',setHeaderH);
+applyTheme();
+if(state.theme==='auto') requestGeo(false);
+setInterval(applyTheme,60000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)applyTheme();});
+renderChips();renderTabbar();setTab('home');
+})();
+</script>
+</body>
+</html>
