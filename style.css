@@ -36,6 +36,7 @@
   --tab-bg:rgba(255,255,255,.94);
   --sheet-bg:#FFFFFF;
   --btn-bg:#2E6BDC; --btn-ink:#FFFFFF;
+  --pt:#12A150;
 }
 
 /* ---------- 深色 ---------- */
@@ -54,6 +55,7 @@
   --tab-bg:rgba(10,10,20,.88);
   --sheet-bg:#11111C;
   --btn-bg:#6EA8FF; --btn-ink:#07070F;
+  --pt:#2ECC71;
 }
 
 /* ---------- 典藏 Dark Luxury Editorial ---------- */
@@ -78,6 +80,7 @@
   --num-style:italic;
   --head-track:.08em;
   --statusbar:#0B070B;
+  --pt:#E2C893;
 }
 
 /* ---------- 基礎 ---------- */
@@ -427,14 +430,14 @@ mark{
 }
 .calc-q input:focus{border-color:var(--accent)}
 .linkbtn{min-height:32px;padding:0 6px;color:var(--accent);font-weight:700;font-size:13px}
-.amt{display:block;font-size:12px;color:var(--text-2);text-align:right;white-space:nowrap;margin-top:2px}
+.amt{display:block;font-size:14px;font-weight:800;color:var(--pt);text-align:right;white-space:nowrap;margin-top:3px;font-variant-numeric:tabular-nums}
 .amt:empty{display:none}
 .res-rate{flex:none;display:flex;flex-direction:column;align-items:flex-end}
 .res-row.na .res-name,.res-row.na .rate-pill{opacity:.5}
 .res-row.na .rate-pill{text-decoration:line-through}
 .today-line{display:flex;align-items:center;gap:10px;margin:2px 0 4px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--line);font-size:13.5px}
 .today-line .tl-main{flex:1;min-width:0}
-.today-line .amt{display:inline;margin-left:6px;text-align:left}
+.today-line .amt{display:inline-block;margin-left:8px;font-size:16px;text-align:left}
 .sec-title .star{margin:-10px -10px -10px 0}
 .formula{font-size:13px;color:var(--text-2);margin:0 0 6px;font-variant-numeric:tabular-nums}
 .pay-box{margin-top:6px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface-2);font-size:13px}
@@ -465,6 +468,7 @@ mark{
 .c-fig{display:grid;grid-template-columns:repeat(3,auto);grid-auto-flow:column;grid-template-rows:auto auto;justify-content:start;gap:0 22px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
 .c-fig dt{font-size:12px;color:var(--text-2)}
 .c-fig dd{font-size:15px}
+.c-fig dd:first-of-type{font-size:20px;font-weight:800;color:var(--pt);line-height:1.2}
 .c-fig dd.neg{color:var(--danger)}
 
 /* ---------- 底部分頁列 ---------- */
@@ -562,7 +566,21 @@ mark{
 .bp-n b{font-family:var(--font-head);letter-spacing:var(--head-track);font-size:17px;font-weight:800}
 .bp-c{font-size:14px;color:var(--bc-text-2);margin-top:2px;word-break:break-word}
 .bp-note{font-size:12.5px;color:var(--bc-text-2);margin:6px 0 0}
-.best-card .formula{margin:10px 0 0;color:var(--bc-text-2)}
+.best-card .formula{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;margin:10px 0 0;padding:8px 12px;
+  border-radius:12px;background:var(--bc-surface);color:var(--bc-text-2);
+}
+.formula .pt-l{font-size:13px;font-weight:700;margin-right:2px}
+.formula .pt-a{font-size:13px}
+.formula .pt-n{font-size:30px;font-weight:800;line-height:1.05;color:#2ECC71}
+.formula .pt-u{font-size:15px;font-weight:700;color:#2ECC71}
+.formula .pt-x{flex-basis:100%;font-size:13px}
+.formula .pt-x b{color:inherit}
+.formula .pt-hint{font-size:13px}
+[data-theme="light"] .formula .pt-n,[data-theme="light"] .formula .pt-u{color:#12A150}
+[data-theme="luxe"] .best-card .formula{border-radius:0;border:1px solid var(--bc-line)}
+[data-theme="luxe"] .formula .pt-n{font-family:"Bodoni Moda","Didot",serif;font-style:italic;color:#E2C893}
+[data-theme="luxe"] .formula .pt-u{color:#E2C893}
 .best-card .pay-box{background:var(--bc-surface);margin-top:8px}
 .best-card .pay-lim,.best-card .pay-src,.best-card .why dt,.best-card .why .q{color:var(--bc-text-2)}
 .best-card .pay-lim b,.best-card .why .q b{color:inherit}
