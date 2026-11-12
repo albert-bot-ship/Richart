@@ -46,6 +46,7 @@
 <main id="main">
   <section class="page" id="page-home" aria-label="首頁"></section>
   <section class="page" id="page-search" aria-label="搜尋" hidden></section>
+  <section class="page" id="page-calc" aria-label="試算" hidden></section>
   <section class="page" id="page-wallet" aria-label="錢包" hidden></section>
   <section class="page" id="page-favs" aria-label="收藏" hidden></section>
 </main>
@@ -255,9 +256,39 @@ var BASE={id:'base',name:'免切換',fixed:true,max:1.3,period:P7,
  ],
  notes:[]};
 
-/* 搜尋用別名（只用來比對，不顯示） */
-var ALIAS={'7-11':['統一超商','小七','seven'],'全家':['familymart'],'萬家福':['家樂福','carrefour'],'樂家康':['家樂福','carrefour'],
- '臺鐵':['火車'],'中華航空':['華航'],'台灣虎航':['虎航'],'Foodpanda':['熊貓'],'Uber Eats':['ubereats']};
+/* 搜尋用同義詞（雙向：任一詞命中即擴充整組；只用來比對，不顯示） */
+var SYN=[
+ ['7-11','711','7eleven','小七','seven','統一超商'],
+ ['全家','familymart','famima'],
+ ['萬家福','家樂福','carrefour'],
+ ['樂家康','家樂福','carrefour'],
+ ['臺鐵','火車','tra'],
+ ['高鐵','thsr'],
+ ['中華航空','華航','chinaairlines'],
+ ['長榮航空','長榮','evaair'],
+ ['星宇航空','星宇','starlux'],
+ ['台灣虎航','虎航','tigerair'],
+ ['日本航空','日航','jal'],
+ ['Foodpanda','熊貓'],
+ ['Uber Eats','ubereats','優食'],
+ ['UNIQLO','優衣庫'],
+ ['唐吉訶德','donki','驚安殿堂'],
+ ['屈臣氏','watsons'],
+ ['康是美','cosmed'],
+ ['寶雅','poya'],
+ ['50嵐','五十嵐'],
+ ['ChatGPT','gpt','openai'],
+ ['PlayStation','ps5','sony'],
+ ['Nintendo','任天堂','switch'],
+ ['Disney+','迪士尼'],
+ ['海外消費','國外消費','出國']
+];
+
+/* 幣別（匯率來源：ExchangeRate-API 公開端點，每日更新） */
+var CURS=[['TWD','新臺幣','NT$'],['JPY','日圓','¥'],['KRW','韓元','₩'],['USD','美元','US$'],['EUR','歐元','€'],
+ ['CNY','人民幣','RMB '],['HKD','港幣','HK$'],['THB','泰銖','฿'],['SGD','新加坡幣','S$'],['GBP','英鎊','£']];
+var FX_API='https://open.er-api.com/v6/latest/TWD', FX_SITE='https://www.exchangerate-api.com';
+var TW_ONLY='限交易地為臺灣且交易幣別為新臺幣';
 
 var CATS=[['all','全部'],['party','聚會微醺'],['drink','手搖咖啡'],['dine','餐飲外送'],['mart','超商量販'],['transit','交通'],['fuel','加油充電'],
  ['health','藥妝保健'],['sport','健身'],['dept','百貨Outlet'],['home','居家'],['fashion','服飾運動'],['ent','娛樂購票'],['hotel','飯店'],
@@ -292,6 +323,7 @@ var IC={
  search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.3-4.3"/>',
  wallet:'<path d="M4 7.5h15.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 7.5 15 4l1.2 3.5M16.5 14h.01"/>',
  star:'<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+ calc:'<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 6.5h7v3h-7zM9 13h.01M12 13h.01M15 13h.01M9 16.5h.01M12 16.5h.01M15 16.5h.01"/>',
  sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4"/><circle cx="15" cy="7" r="0"/>',
  close:'<path d="M6 6l12 12M18 6 6 18"/>',
  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
@@ -309,7 +341,7 @@ var store={
 };
 var state={
  theme:store.get('theme','auto'), level:store.get('level',2), main:store.get('main',null), favs:store.get('favs',[]),
- geo:store.get('geo',null), tilt:store.get('tilt',false), wmode:store.get('wmode','stack'), hview:null, tab:'home', q:'', cat:'all', open:null, flip:false
+ geo:store.get('geo',null), tilt:store.get('tilt',false), wmode:store.get('wmode','stack'), hview:null, amt:'', cur:store.get('cur','TWD'), cq:'', ccat:'all', qfavs:store.get('qfavs',[]), tab:'home', q:'', cat:'all', open:null, flip:false
 };
 var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -317,21 +349,39 @@ var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').mat
 function $(s,r){return (r||document).querySelector(s);}
 function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function norm(s){return String(s).toLowerCase().replace(/臺/g,'台').replace(/[\s\-–・·．.()（）]/g,'');}
+function norm(s){return String(s).replace(/[\uff01-\uff5e]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xfee0);}).replace(/\u3000/g,' ').toLowerCase().replace(/臺/g,'台').replace(/[\s\-–・·．.()（）]/g,'');}
+function stripEx(s){return String(s).replace(/[(（]不含[^)）]*[)）]/g,'');}
 function fmt(n){return (Math.round(n*10)/10).toString();}
 function plan(id){if(id==='base')return BASE;for(var i=0;i<PLANS.length;i++)if(PLANS[i].id===id)return PLANS[i];return null;}
 function rateOf(p,r){return (p.fixed||state.level===2)?r:1.3;}
 function maxOf(p){return state.level===2?p.max:1.3;}
 function parseD(s){var a=s.split('-');return new Date(+a[0],+a[1]-1,+a[2]);}
 function dstr(s){var d=parseD(s);return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();}
-function hl(text,q){
-  var t=esc(text); if(!q) return t;
-  var pat=Array.prototype.map.call(q.trim(),function(ch){
-    if(/[台臺]/.test(ch)) return '[台臺]';
-    if(/\s/.test(ch)) return '\\s*';
-    return esc(ch).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  }).join('');
-  try{return t.replace(new RegExp(pat,'gi'),function(m){return '<mark>'+m+'</mark>';});}catch(e){return t;}
+function hl(text,tq){
+  text=String(text);
+  if(!tq||!tq.length) return esc(text);
+  var sep='[\\s\\-–・·．.()（）]*', skip=[], rg=[];
+  text.replace(/[(（]不含[^)）]*[)）]/g,function(m,off){skip.push([off,off+m.length]);return m;});
+  tq.forEach(function(t){
+    if(!t) return;
+    var pat=Array.prototype.map.call(t,function(ch){
+      if(ch==='台') return '[台臺]';
+      if(/[a-z0-9]/.test(ch)) return '['+ch+ch.toUpperCase()+String.fromCharCode(ch.charCodeAt(0)+0xfee0)+String.fromCharCode(ch.toUpperCase().charCodeAt(0)+0xfee0)+']';
+      return ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    }).join(sep);
+    try{var re=new RegExp(pat,'g'),m;
+      while((m=re.exec(text))){ if(!m[0].length){re.lastIndex++;continue;}
+        var a=m.index,b=a+m[0].length;
+        if(!skip.some(function(x){return a<x[1]&&b>x[0];})) rg.push([a,b]); }
+    }catch(err){}
+  });
+  if(!rg.length) return esc(text);
+  rg.sort(function(x,y){return x[0]-y[0];});
+  var mg=[rg[0].slice()];
+  rg.slice(1).forEach(function(r){var l=mg[mg.length-1];if(r[0]<=l[1])l[1]=Math.max(l[1],r[1]);else mg.push(r.slice());});
+  var out='',pos=0;
+  mg.forEach(function(r){out+=esc(text.slice(pos,r[0]))+'<mark>'+esc(text.slice(r[0],r[1]))+'</mark>';pos=r[1];});
+  return out+esc(text.slice(pos));
 }
 function status(p){
   var now=new Date(), s=parseD(p.period[0]), e=parseD(p.period[1]), end=new Date(e.getTime()+864e5);
@@ -349,7 +399,9 @@ var ENTRIES=[];
 PLANS.concat([BASE]).forEach(function(p){
   p.groups.forEach(function(g){
     g.items.forEach(function(it){
-      ENTRIES.push({p:p,g:g,item:it,c:g.c,tag:(g.tags&&g.tags[it])||g.cond||'',key:norm(it),gkey:norm(g.t),alias:(ALIAS[it]||[]).map(norm)});
+      var k=norm(stripEx(it)),al=[];
+      SYN.forEach(function(gp){var ng=gp.map(norm);if(ng.indexOf(k)>-1)ng.forEach(function(w){if(w!==k&&al.indexOf(w)<0)al.push(w);});});
+      ENTRIES.push({p:p,g:g,item:it,c:g.c,tag:(g.tags&&g.tags[it])||g.cond||'',key:k,gkey:norm(g.t),alias:al});
     });
   });
 });
@@ -542,70 +594,297 @@ function homeSync(i){
 }
 
 /* ---------- 搜尋 ---------- */
-function findEntries(){
-  var q=norm(state.q),cat=state.cat;
-  return ENTRIES.filter(function(e){
-    if(cat!=='all'&&e.c!==cat) return false;
-    if(!q) return cat!=='all';
-    if(e.key.indexOf(q)>-1||e.gkey.indexOf(q)>-1) return true;
-    for(var i=0;i<e.alias.length;i++) if(e.alias[i].indexOf(q)>-1) return true;
-    return false;
+function terms(q){
+  var nq=norm(q); if(!nq) return [];
+  var out=[nq];
+  SYN.forEach(function(gp){var ng=gp.map(norm);if(ng.indexOf(nq)>-1)ng.forEach(function(w){if(out.indexOf(w)<0)out.push(w);});});
+  return out;
+}
+/* 比對方式：text 名稱、syn 同義詞、alias 別名、group 類別 */
+function matchHow(e,tq){
+  if(!tq.length) return null;
+  if(e.key.indexOf(tq[0])>-1) return 'text';
+  for(var i=1;i<tq.length;i++) if(e.key.indexOf(tq[i])>-1) return 'syn';
+  for(var j=0;j<e.alias.length;j++) if(e.alias[j].indexOf(tq[0])>-1) return 'alias';
+  for(var k=0;k<tq.length;k++) if(e.gkey.indexOf(tq[k])>-1) return 'group';
+  return null;
+}
+var HOW_TXT={syn:'別名相符',alias:'別名相符',group:'類別相符'};
+function mk(e,extra){var r=Object.create(e);for(var k in extra)r[k]=extra[k];return r;}
+function twOnly(e){
+  return (e.tag&&e.tag.indexOf(TW_ONLY)>-1)||e.g.t==='全臺餐飲'||e.g.t.indexOf('LINE Pay 及 全盈+Pay')===0;
+}
+var NOT_TW='限交易地非臺灣或交易幣別非新臺幣';
+/* 依幣別判斷不適用：外幣時排除限新臺幣項目；新臺幣時排除限非新臺幣項目 */
+function naOf(e){
+  if(fxOn()) return twOnly(e)?'外幣交易不適用':'';
+  return (e.tag&&e.tag.indexOf(NOT_TW)>-1)?'新臺幣交易不適用':'';
+}
+function entryOf(pid,test){for(var i=0;i<ENTRIES.length;i++){var e=ENTRIES[i];if(e.p.id===pid&&test(e))return e;}return null;}
+var OVERSEAS=entryOf('travel',function(e){return e.item==='海外消費';});
+var HOLIDAY=entryOf('holiday',function(e){return e.g.t.indexOf('節假日不限通路')===0;});
+
+/* ---------- 試算：金額、幣別、匯率 ---------- */
+var FX=store.get('fx',null)||{};
+function fxOn(){return state.cur!=='TWD';}
+function curOf(c){for(var i=0;i<CURS.length;i++)if(CURS[i][0]===c)return CURS[i];return CURS[0];}
+function amt(){var a=parseFloat(String(state.amt).replace(/[,，\s]/g,''));return a>0?a:0;}
+function fxRate(){if(!fxOn())return 1;return (FX.rates&&FX.rates[state.cur])?1/FX.rates[state.cur]:null;}
+function ntd(){var a=amt(),r=fxRate();return (a&&r)?a*r:0;}
+function feeRate(e){
+  if(!fxOn()) return 0;
+  if(e&&e.g&&e.g.t==='台新Pay+'&&(state.cur==='JPY'||state.cur==='KRW')) return 0;
+  return 1.5;
+}
+function n1(x){return (Math.round(x*10)/10).toLocaleString('zh-TW',{maximumFractionDigits:1});}
+function n0(x){return Math.round(x).toLocaleString('zh-TW');}
+function nA(x){return x.toLocaleString('zh-TW',{maximumFractionDigits:2});}
+function ptsText(rate){var n=ntd();return n?'約 '+n1(n*rate/100)+' 點':'';}
+function formulaText(rate,fee){
+  var a=amt(); if(!a) return '輸入上方金額，可試算回饋點數';
+  var n=ntd(); if(!n) return '匯率取得中，暫無法換算';
+  var pts=n*rate/100, s=(fxOn()?curOf(state.cur)[2]+nA(a)+' ≈ NT$'+n0(n):'NT$'+nA(a))+' × '+fmt(rate)+'% = 約 '+n1(pts)+' 點';
+  if(fxOn()){
+    if(fee){var f=n*fee/100;s+='；國外交易手續費 '+fee+'% ≈ NT$'+n1(f)+'；淨回饋約 '+n1(pts-f);}
+    else s+='；台新Pay+ 日韓交易免1.5%國外交易手續費';
+  }
+  return s;
+}
+function updateAmts(){
+  $$('[data-rate]').forEach(function(el){
+    var r=parseFloat(el.getAttribute('data-rate'));
+    if(el.hasAttribute('data-formula')) el.textContent=formulaText(r,parseFloat(el.getAttribute('data-fee')||'0'));
+    else el.textContent=ptsText(r);
   });
+}
+function loadFx(force){
+  if(!fxOn()||FX.loading) return;
+  if(!force&&FX.rates&&Date.now()-FX.t<6*3600e3) return;
+  if(!window.fetch){FX.err=true;renderFxLine();return;}
+  FX.loading=true;FX.err=false;renderFxLine();
+  fetch(FX_API).then(function(r){return r.json();}).then(function(d){
+    if(!d||d.result!=='success'||!d.rates) throw new Error('fx');
+    FX={t:Date.now(),upd:(d.time_last_update_unix||0)*1000,rates:d.rates};store.set('fx',FX);
+    refreshCalc();
+  }).catch(function(){FX.loading=false;FX.err=true;refreshCalc();});
+}
+function fxLineHTML(){
+  if(!fxOn()) return '';
+  var c=curOf(state.cur),r=fxRate();
+  if(r){
+    var d=new Date(FX.upd||FX.t);
+    return '1 '+c[0]+' ≈ NT$'+(r<0.1?r.toFixed(5):r.toFixed(4))+'　匯率日期 '+d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()+
+      '<br>匯率來源：<a href="'+FX_SITE+'" target="_blank" rel="noopener">ExchangeRate-API</a>（每日更新，僅供估算；實際計算匯率以信用卡國際組織公告為準）'+
+      (FX.err?'<br>目前無法更新，沿用上次取得的匯率 <button class="linkbtn" data-act="fxretry">重試</button>':'');
+  }
+  if(FX.loading) return '取得匯率中…';
+  return '無法取得匯率，請確認網路連線 <button class="linkbtn" data-act="fxretry">重試</button>';
+}
+function renderFxLine(){$$('.fx-line').forEach(function(el){el.innerHTML=fxLineHTML();el.hidden=!fxOn();});}
+function calcBarHTML(){
+  return '<div class="calc-bar"><label class="cb-amt"><span>試算金額</span><input class="amt-in" type="text" inputmode="decimal" autocomplete="off" placeholder="例如 1800" value="'+esc(state.amt)+'" aria-label="試算金額"></label>'+
+    '<select class="cur-in" aria-label="幣別">'+CURS.map(function(c){return '<option value="'+c[0]+'"'+(state.cur===c[0]?' selected':'')+'>'+c[1]+' '+c[0]+'</option>';}).join('')+'</select></div>'+
+    '<p class="fx-line"'+(fxOn()?'':' hidden')+'>'+fxLineHTML()+'</p>';
+}
+function refreshCalc(){
+  renderFxLine();
+  if(state.tab==='search') renderSearch();
+  else if(state.tab==='calc') renderCalcBody();
+  else updateAmts();
+}
+
+/* ---------- 支付方式與「怎麼來的」 ---------- */
+var NOTE_ALIAS={'訂房旅行':'訂房平台'};
+function notesFor(e){
+  var p=e.p,it=norm(stripEx(e.item)),gt=norm(e.g.t),pn=norm(p.name);
+  return p.notes.filter(function(n){
+    if(norm(n.h)===pn) return true;
+    var toks=(NOTE_ALIAS[n.h]||n.h).split(/[、\/]/).map(norm);
+    return toks.some(function(t){
+      if(!t) return false;
+      return t===it||t===gt||(t.length>=2&&it.indexOf(t)>-1)||(gt.indexOf(t)>-1&&gt.indexOf(t+'+')<0);
+    });
+  });
+}
+var PAY_RE=/Pay|實體卡|支付|綁定|刷卡|錢包/;
+function payOf(e){
+  if(e.p.fixed) return null;
+  var txt=e.g.cond||(e.g.t.indexOf('LINE Pay 及 全盈+Pay')===0?'LINE Pay 及 全盈+Pay綁定支付':e.p.pay);
+  var lim=notesFor(e).filter(function(n){return PAY_RE.test(n.t);});
+  return {txt:txt,lim:lim};
+}
+function payHTML(e){
+  var pay=payOf(e); if(!pay) return '';
+  return '<div class="pay-box"><div class="pay-h">結帳可用付款方式</div><p>'+esc(pay.txt)+'</p>'+
+    pay.lim.map(function(n){return '<p class="pay-lim"><b>'+esc(n.h)+'</b>'+esc(n.t)+'</p>';}).join('')+
+    '<div class="pay-src">依據：台新銀行 Richart卡活動頁「'+esc(e.p.name)+'」支付方式及注意事項</div></div>';
+}
+function whyHTML(e,rate){
+  var p=e.p,pay=payOf(e),shown=pay?pay.lim:[];
+  var notes=notesFor(e).filter(function(n){return shown.indexOf(n)<0;});
+  var rows=[['方案',(p.fixed?'免切換':p.name)+'（'+dstr(p.period[0])+'–'+dstr(p.period[1])+'）'],['類別',e.g.t+'　'+fmt(e.g.r)+'%'],['通路',e.item]];
+  if(!p.fixed) rows.push(['等級',state.level===2?'LEVEL 2：依方案回饋率':'LEVEL 1：切換刷加碼通路最高1.3%']);
+  if(e.tag) rows.push(['條件',e.tag]);
+  return '<details class="why"><summary>這個 '+fmt(rate)+'% 怎麼來的？</summary><dl>'+
+    rows.map(function(r){return '<dt>'+r[0]+'</dt><dd>'+esc(r[1])+'</dd>';}).join('')+'</dl>'+
+    (e.g.extra?'<p class="q">'+esc(e.g.extra)+'</p>':'')+
+    (notes.length?'<div class="q-h">官方注意事項</div>'+notes.map(function(n){return '<p class="q"><b>'+esc(n.h)+'</b>'+esc(n.t)+'</p>';}).join(''):'')+
+    '<a href="'+SRC+'" target="_blank" rel="noopener">查看官方活動頁</a></details>';
+}
+
+/* ---------- 搜尋 ---------- */
+function findRows(tq){
+  var on=fxOn(),cat=state.cat,rows=[];
+  ENTRIES.forEach(function(e){
+    if(status(e.p).k==='danger') return;
+    if(cat!=='all'&&e.c!==cat) return;
+    var how=tq.length?matchHow(e,tq):null;
+    if(tq.length&&!how) return;
+    if(!tq.length&&cat==='all') return;
+    rows.push(mk(e,{how:how,rate:rateOf(e.p,e.g.r),na:naOf(e),fee:feeRate(e)}));
+  });
+  if(on&&OVERSEAS&&status(OVERSEAS.p).k!=='danger'&&!rows.some(function(r){return r.p.id==='travel'&&r.item==='海外消費';}))
+    rows.push(mk(OVERSEAS,{how:null,rate:rateOf(OVERSEAS.p,OVERSEAS.g.r),na:false,fee:feeRate(OVERSEAS),viaFx:true,tag:'外幣交易視為海外消費'}));
+  rows.sort(function(a,b){return ((a.na?1:0)-(b.na?1:0))||(b.rate-a.rate)||PLANS.indexOf(a.p)-PLANS.indexOf(b.p);});
+  return rows;
 }
 function rowTags(e){
   var t='';
+  if(e.how&&e.how!=='text') t+='<span class="tag">'+HOW_TXT[e.how]+'</span>';
+  if(e.na) t+='<span class="tag danger">'+e.na+'</span>';
   if(e.tag) t+='<span class="tag warn">'+esc(e.tag)+'</span>';
   var st=status(e.p);
   if(st.soon) t+='<span class="tag warn">'+esc(st.t)+'</span>';
   if(st.k==='danger') t+='<span class="tag danger">已結束</span>';
   return t?'<div class="res-tags">'+t+'</div>':'';
 }
+function mainLine(rows){
+  if(!state.main) return '<div class="today-line"><span>尚未設定今日主卡</span><button class="linkbtn" data-act="pickmain">設定</button></div>';
+  var p=plan(state.main),hit=rows.filter(function(r){return r.p===p&&!r.na;}),txt,rate;
+  if(hit.length){rate=hit[0].rate;txt='此通路 <b>'+fmt(rate)+'%</b>（'+esc(hit[0].item)+'）';}
+  else if(p.id==='holiday'){rate=rateOf(p,2);txt='國內節假日不限通路 <b>'+fmt(rate)+'%</b>'+(fxOn()?'（海外消費是否適用，請以官方公告為準）':'');}
+  else{rate=0.3;txt='非「'+esc(p.name)+'」指定通路，以一般消費 <b>0.3%</b> 計算';}
+  return '<div class="today-line"><span class="swatch" style="--g:'+p.g+'"></span><span class="tl-main">今日主卡「'+esc(p.name)+'」：'+txt+'<small class="amt" data-rate="'+rate+'"></small></span><button class="linkbtn" data-act="pickmain">更改</button></div>';
+}
+function qfavBtn(q){
+  var on=state.qfavs.indexOf(q)>-1;
+  return '<button class="star" data-act="qfav" data-q="'+esc(q)+'" aria-pressed="'+on+'" aria-label="'+(on?'取消收藏此搜尋':'收藏此搜尋')+'">'+starIcon(on)+'</button>';
+}
+function qfavChips(){
+  if(!state.qfavs.length) return '';
+  return '<div class="quick qfavs">'+state.qfavs.map(function(k){
+    return '<span class="qchip"><button data-act="quick" data-q="'+esc(k)+'">'+esc(k)+'</button><button data-act="unqfav" data-q="'+esc(k)+'" aria-label="移除收藏 '+esc(k)+'">'+icon('close')+'</button></span>';
+  }).join('')+'</div>';
+}
+function ensureSearchShell(){
+  if($('#sBody')) return;
+  $('#page-search').innerHTML='<div class="panel calc-panel">'+calcBarHTML()+'</div><div id="sBody"></div>';
+}
 function renderSearch(){
-  var h='',q=state.q.trim();
+  ensureSearchShell();
+  var h='',q=state.q.trim(),tq=terms(q),body=$('#sBody');
   if(!q&&state.cat==='all'){
     h+='<h2 class="sec-title">搜尋</h2><div class="panel"><p class="hint">輸入商家名稱，或點上方類別，找出回饋最高的方案。</p><div class="quick">'+
       ['全家','Uber Eats','蝦皮','海外消費','保費','Netflix','UNIQLO','50嵐'].map(function(k){return '<button data-act="quick" data-q="'+esc(k)+'">'+esc(k)+'</button>';}).join('')+
       '</div></div>';
-    $('#page-search').innerHTML=h;return;
+    if(state.qfavs.length) h+='<h2 class="sec-title">收藏的搜尋</h2>'+qfavChips();
+    body.innerHTML=h;return;
   }
-  var rows=findEntries().filter(function(e){return status(e.p).k!=='danger';});
+  var rows=findRows(tq),ok=rows.filter(function(r){return !r.na;});
   var catName='';CATS.forEach(function(c){if(c[0]===state.cat)catName=c[1];});
-  h+='<h2 class="sec-title">'+(q?'「'+esc(q)+'」':'')+(state.cat!=='all'?(q?'・':'')+esc(catName):'')+'<span class="aside">'+rows.length+' 筆</span></h2>';
+  h+=mainLine(rows);
+  h+='<h2 class="sec-title">'+(q?'「'+esc(q)+'」':'')+(state.cat!=='all'?(q?'・':'')+esc(catName):'')+'<span class="aside">'+rows.length+' 筆</span>'+(q?qfavBtn(q):'')+'</h2>';
   if(state.level===1) h+='<p class="hint" style="margin:-4px 0 10px">目前以 LEVEL 1 計算：切換刷加碼通路最高1.3%</p>';
-  if(!rows.length){
+  if(!ok.length){
     h+='<div class="panel empty"><b>找不到符合的商家</b>試試較短的關鍵字，或改用類別篩選。未列出的通路以一般消費 0.3% 計算。</div>';
-    $('#page-search').innerHTML=h;return;
-  }
-  rows.forEach(function(e){e.rate=rateOf(e.p,e.g.r);});
-  rows.sort(function(a,b){return b.rate-a.rate||PLANS.indexOf(a.p)-PLANS.indexOf(b.p);});
-  /* 最佳選擇 */
-  var top=rows[0].rate,best={},order=[];
-  rows.forEach(function(e){if(e.rate===top){if(!best[e.p.id]){best[e.p.id]=[];order.push(e.p.id);}if(best[e.p.id].indexOf(e.item)<0)best[e.p.id].push(e.item);}});
-  h+='<div class="panel vitrine best"><div class="best-label">'+icon('crown')+'最佳選擇</div>';
-  order.slice(0,4).forEach(function(pid){
-    var p=plan(pid),its=best[pid];
-    h+='<div class="best-row"><span class="swatch" style="--g:'+p.g+'"></span><div class="best-main"><div class="best-plan">'+esc(p.fixed?'免切換':p.name)+'</div><div class="best-items">'+its.slice(0,6).map(function(x){return hl(x,q);}).join('、')+(its.length>6?' 等 '+its.length+' 家':'')+'</div></div><div class="best-rate num">'+fmt(top)+'<small>%</small></div></div>';
-  });
-  h+='</div>';
-  /* 依方案分組 */
-  h+='<h2 class="sec-title">全部結果</h2>';
-  var byPlan={},porder=[];
-  rows.forEach(function(e){if(!byPlan[e.p.id]){byPlan[e.p.id]=[];porder.push(e.p.id);}byPlan[e.p.id].push(e);});
-  porder.forEach(function(pid){
-    var p=plan(pid),st=status(p);
-    h+='<div class="panel"><div class="res-plan-head"><span class="swatch" style="--g:'+p.g+'"></span><b>'+esc(p.fixed?'免切換':p.name)+'</b><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>';
-    byPlan[pid].forEach(function(e){
-      var fav=state.favs.indexOf(e.item)>-1;
-      h+='<div class="res-row"><div class="res-main"><div class="res-name">'+hl(e.item,q)+'</div><div class="res-sub">'+hl(e.g.t,q)+'</div>'+rowTags(e)+'</div>'+
-         '<span class="rate-pill num">'+fmt(e.rate)+'<small>%</small></span>'+
-         '<button class="star" data-act="fav" data-item="'+esc(e.item)+'" aria-pressed="'+fav+'" aria-label="收藏 '+esc(e.item)+'">'+starIcon(fav)+'</button></div>';
+  }else{
+    /* 最佳選擇 */
+    var top=ok[0].rate,best={},order=[];
+    ok.forEach(function(e){if(e.rate===top){if(!best[e.p.id]){best[e.p.id]=[];order.push(e.p.id);}if(!best[e.p.id].some(function(x){return x.item===e.item;}))best[e.p.id].push(e);}});
+    h+='<div class="panel vitrine best"><div class="best-label">'+icon('crown')+'最佳選擇</div>';
+    order.slice(0,4).forEach(function(pid){
+      var p=plan(pid),its=best[pid],e0=its[0];
+      h+='<div class="best-block"><div class="best-row"><span class="swatch" style="--g:'+p.g+'"></span><div class="best-main"><div class="best-plan">'+esc(p.fixed?'免切換':p.name)+(state.main===p.id?' <span class="tag ok">今日主卡</span>':'')+'</div><div class="best-items">'+its.slice(0,6).map(function(x){return hl(x.item,tq);}).join('、')+(its.length>6?' 等 '+its.length+' 家':'')+'</div></div><div class="best-rate num">'+fmt(top)+'<small>%</small></div></div>'+
+        '<p class="formula" data-formula data-rate="'+top+'" data-fee="'+e0.fee+'"></p>'+
+        (e0.viaFx?'<p class="hint">外幣交易：依官方「海外消費指交易幣別為外幣，或交易國別非臺灣」</p>':'')+
+        payHTML(e0)+whyHTML(e0,top)+'</div>';
     });
     h+='</div>';
-  });
-  if(q&&!rows.some(function(e){return e.p.id==='holiday';})){
-    h+='<div class="panel" style="margin-top:10px"><div class="res-plan-head"><span class="swatch" style="--g:'+plan('holiday').g+'"></span><b>假日刷</b><span class="rate-pill num">'+fmt(rateOf(plan('holiday'),2))+'<small>%</small></span></div><p class="hint">節假日不限通路(含保費)消費享2% (含LINE Pay及全盈+Pay綁定)</p></div>';
+    /* 依方案分組 */
+    h+='<h2 class="sec-title">全部結果</h2>';
+    var byPlan={},porder=[];
+    rows.forEach(function(e){if(!byPlan[e.p.id]){byPlan[e.p.id]=[];porder.push(e.p.id);}byPlan[e.p.id].push(e);});
+    porder.forEach(function(pid){
+      var p=plan(pid),st=status(p);
+      h+='<div class="panel"><div class="res-plan-head"><span class="swatch" style="--g:'+p.g+'"></span><b>'+esc(p.fixed?'免切換':p.name)+'</b><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>';
+      byPlan[pid].forEach(function(e){
+        var fav=state.favs.indexOf(e.item)>-1;
+        h+='<div class="res-row'+(e.na?' na':'')+'"><div class="res-main"><div class="res-name">'+(e.how==='group'?esc(e.item):hl(e.item,tq))+'</div><div class="res-sub">'+(e.how==='group'?hl(e.g.t,tq):esc(e.g.t))+'</div>'+rowTags(e)+'</div>'+
+           '<div class="res-rate"><span class="rate-pill num">'+fmt(e.rate)+'<small>%</small></span>'+(e.na?'':'<small class="amt" data-rate="'+e.rate+'"></small>')+'</div>'+
+           '<button class="star" data-act="fav" data-item="'+esc(e.item)+'" aria-pressed="'+fav+'" aria-label="收藏 '+esc(e.item)+'">'+starIcon(fav)+'</button></div>';
+      });
+      h+='</div>';
+    });
   }
-  $('#page-search').innerHTML=h;
+  if(q&&!rows.some(function(e){return e.p.id==='holiday';})){
+    h+='<div class="panel" style="margin-top:10px"><div class="res-plan-head"><span class="swatch" style="--g:'+plan('holiday').g+'"></span><b>假日刷</b><span class="rate-pill num">'+fmt(rateOf(plan('holiday'),2))+'<small>%</small></span></div><p class="hint">節假日不限通路(含保費)消費享2% (含LINE Pay及全盈+Pay綁定)'+(fxOn()?'<br>海外消費是否適用，請以官方公告為準':'')+'</p></div>';
+  }
+  body.innerHTML=h;
+  updateAmts();
+}
+
+/* ---------- 試算頁 ---------- */
+function renderCalc(){
+  if(!$('#cBody')){
+    $('#page-calc').innerHTML='<h2 class="sec-title">回饋試算<span class="aside">比較各方案</span></h2>'+
+      '<div class="panel calc-panel">'+calcBarHTML()+
+      '<div class="calc-q"><input id="cq" type="search" placeholder="商家名稱（可留空）" autocomplete="off" value="'+esc(state.cq)+'" aria-label="商家名稱">'+
+      '<select id="ccat" aria-label="類別">'+CATS.map(function(c){return '<option value="'+c[0]+'"'+(state.ccat===c[0]?' selected':'')+'>'+(c[0]==='all'?'不限類別':esc(c[1]))+'</option>';}).join('')+'</select></div></div>'+
+      '<div id="cBody"></div>';
+  }
+  renderCalcBody();
+}
+function renderCalcBody(){
+  var box=$('#cBody');if(!box) return;
+  var tq=terms(state.cq),on=fxOn(),n=ntd(),a=amt(),list=[];
+  var matched=(tq.length||state.ccat!=='all')?ENTRIES.filter(function(e){return (state.ccat==='all'||e.c===state.ccat)&&(!tq.length||matchHow(e,tq));}):[];
+  PLANS.concat([BASE]).forEach(function(p){
+    if(status(p).k==='danger') return;
+    var c=matched.filter(function(e){return e.p===p&&!naOf(e);}).map(function(e){return {e:e,rate:rateOf(p,e.g.r)};});
+    if(p.fixed&&!c.length) return;
+    if(on&&p.id==='travel'&&OVERSEAS) c.push({e:OVERSEAS,rate:rateOf(p,OVERSEAS.g.r),fx:true});
+    if(p.id==='holiday'&&HOLIDAY) c.push({e:HOLIDAY,rate:rateOf(p,HOLIDAY.g.r),hol:true});
+    c.sort(function(x,y){return y.rate-x.rate;});
+    var b=c[0]||{e:null,rate:0.3,base:true};
+    var fr=feeRate(b.e),pts=n*b.rate/100,fee=n*fr/100;
+    list.push({p:p,b:b,fr:fr,pts:pts,fee:fee,net:pts-fee});
+  });
+  list.sort(function(x,y){return (on?y.net-x.net:y.pts-x.pts)||(y.b.rate-x.b.rate)||PLANS.indexOf(x.p)-PLANS.indexOf(y.p);});
+  var h='';
+  if(!a) h+='<p class="hint">輸入金額後，會列出每個方案可拿到的回饋'+(on?'、國外交易手續費與淨回饋':'')+'。</p>';
+  else if(!n) h+='<p class="hint">匯率取得中，暫無法換算新臺幣。</p>';
+  else h+='<p class="hint">'+(on?curOf(state.cur)[2]+nA(a)+' ≈ NT$'+n0(n):'NT$'+nA(a))+(tq.length||state.ccat!=='all'?'':'；未指定商家或類別，以一般消費計算')+'</p>';
+  if(state.level===1) h+='<p class="hint">目前以 LEVEL 1 計算：切換刷加碼通路最高1.3%</p>';
+  list.forEach(function(x,i){
+    var p=x.p,b=x.b,tags='';
+    if(i===0&&n) tags+='<span class="tag ok">最佳</span>';
+    if(state.main===p.id) tags+='<span class="tag">今日主卡</span>';
+    if(b.hol) tags+='<span class="tag warn">限國內節假日</span>'+(on?'<span class="tag warn">海外消費是否適用，請以官方公告為準</span>':'');
+    if(b.fx) tags+='<span class="tag warn">外幣交易視為海外消費</span>';
+    if(b.e&&b.e.tag) tags+='<span class="tag warn">'+esc(b.e.tag)+'</span>';
+    if(on&&!x.fr&&b.e) tags+='<span class="tag ok">免國外交易手續費</span>';
+    var sub=b.base?'非指定通路，以一般消費 0.3% 計算':(b.hol?'節假日不限通路(含保費)消費':esc(b.e.item)+'・'+esc(b.e.g.t));
+    h+='<div class="panel c-row'+(i===0&&n?' vitrine':'')+'"><div class="c-head"><span class="swatch" style="--g:'+p.g+'"></span><div class="c-main"><b>'+esc(p.fixed?'免切換':p.name)+'</b><div class="res-sub">'+sub+'</div>'+(tags?'<div class="res-tags">'+tags+'</div>':'')+'</div><span class="rate-pill num">'+fmt(b.rate)+'<small>%</small></span></div>';
+    if(n){
+      h+='<dl class="c-fig"><dt>回饋</dt><dd class="num">約 '+n1(x.pts)+' 點</dd>';
+      if(on) h+='<dt>手續費 '+x.fr+'%</dt><dd class="num">NT$'+n1(x.fee)+'</dd><dt>淨回饋</dt><dd class="num'+(x.net<0?' neg':'')+'"><b>約 '+n1(x.net)+'</b></dd>';
+      h+='</dl>';
+    }
+    h+='</div>';
+  });
+  h+='<p class="src" style="margin-top:12px">試算為約略值，回饋以台新Point(信用卡)計，點數進位方式以台新銀行計算為準。'+(on?'淨回饋以 1 點折合 NT$1 估算；國外交易手續費 1.5%，台新Pay+ 日韓交易依官方「免1.5%國外交易手續費」以 0 計。':'')+
+     '<br>資料來源：<a href="'+SRC+'" target="_blank" rel="noopener">台新銀行 Richart卡活動頁</a>'+(on?'；匯率：<a href="'+FX_SITE+'" target="_blank" rel="noopener">ExchangeRate-API</a>':'')+'</p>';
+  box.innerHTML=h;
 }
 
 /* ---------- 錢包 ---------- */
@@ -702,9 +981,11 @@ function walletTap(pid){
 
 /* ---------- 收藏 ---------- */
 function renderFavs(){
-  var h='<h2 class="sec-title">收藏<span class="aside">'+state.favs.length+' 家</span></h2>';
+  var h='';
+  if(state.qfavs.length) h+='<h2 class="sec-title">收藏的搜尋<span class="aside">'+state.qfavs.length+' 筆</span></h2>'+qfavChips();
+  h+='<h2 class="sec-title">收藏<span class="aside">'+state.favs.length+' 家</span></h2>';
   if(!state.favs.length){
-    h+='<div class="panel empty"><b>還沒有收藏</b>在搜尋結果點星號，把常去的店家收進來，這裡會列出每家最划算的方案。</div>';
+    h+='<div class="panel empty"><b>還沒有收藏</b>在搜尋結果點星號，把常去的店家收進來，這裡會列出每家最划算的方案；點搜尋標題旁的星號，可收藏整個搜尋。</div>';
     $('#page-favs').innerHTML=h;return;
   }
   state.favs.forEach(function(name){
@@ -732,13 +1013,13 @@ function toggleFav(name){
 }
 
 /* ---------- 分頁 ---------- */
-var TABS=[['home','首頁','home2'],['search','搜尋','search'],['wallet','錢包','wallet'],['favs','收藏','star']];
+var TABS=[['home','首頁','home2'],['search','搜尋','search'],['calc','試算','calc'],['wallet','錢包','wallet'],['favs','收藏','star']];
 function renderTabbar(){
   $('#tabbar').innerHTML=TABS.map(function(t){
     return '<button class="tab" data-act="tab" data-tab="'+t[0]+'"'+(state.tab===t[0]?' aria-current="page"':'')+'>'+icon(t[2])+'<span>'+t[1]+'</span></button>';
   }).join('');
 }
-function renderPage(t){({home:renderHome,search:renderSearch,wallet:renderWallet,favs:renderFavs})[t]();}
+function renderPage(t){({home:renderHome,search:renderSearch,calc:renderCalc,wallet:renderWallet,favs:renderFavs})[t]();}
 function setTab(t,keepScroll){
   if(t==='home') state.hview=null;
   state.tab=t;renderTabbar();
@@ -842,6 +1123,14 @@ document.addEventListener('click',function(ev){
       if(state.tilt){disableTilt();state.tilt=false;store.set('tilt',false);renderSettings();toast('已關閉傾斜光澤');}
       else enableTilt(true).then(function(ok){state.tilt=ok;store.set('tilt',ok);if(sheetMode==='settings')renderSettings();toast(ok?'已啟用傾斜光澤':'無法啟用：裝置不支援或未允許');});
       break;
+    case 'qfav':
+      var qq=el.getAttribute('data-q'),qi=state.qfavs.indexOf(qq);
+      if(qi>-1)state.qfavs.splice(qi,1);else state.qfavs.unshift(qq);
+      store.set('qfavs',state.qfavs);toast(qi>-1?'已取消收藏搜尋':'已收藏搜尋「'+qq+'」');renderPage(state.tab);break;
+    case 'unqfav':
+      state.qfavs=state.qfavs.filter(function(x){return x!==el.getAttribute('data-q');});
+      store.set('qfavs',state.qfavs);renderPage(state.tab);break;
+    case 'fxretry': loadFx(true);break;
     case 'clearfavs': state.favs=[];store.set('favs',[]);renderSettings();toast('已清除收藏');if(state.tab!=='home')renderPage(state.tab);break;
   }
 });
@@ -854,6 +1143,25 @@ document.addEventListener('keydown',function(ev){
     return;
   }
   if((ev.key==='Enter'||ev.key===' ')&&el.getAttribute&&el.getAttribute('role')==='button'){ev.preventDefault();el.click();}
+});
+document.addEventListener('input',function(ev){
+  var t=ev.target;
+  if(t.classList&&t.classList.contains('amt-in')){
+    state.amt=t.value;
+    $$('.amt-in').forEach(function(x){if(x!==t)x.value=t.value;});
+    if(state.tab==='calc') renderCalcBody(); else updateAmts();
+  }else if(t.id==='cq'){
+    clearTimeout(cqT);cqT=setTimeout(function(){state.cq=t.value;renderCalcBody();},120);
+  }
+});
+var cqT=null;
+document.addEventListener('change',function(ev){
+  var t=ev.target;
+  if(t.classList&&t.classList.contains('cur-in')){
+    state.cur=t.value;store.set('cur',state.cur);
+    $$('.cur-in').forEach(function(x){x.value=state.cur;});
+    loadFx(false);refreshCalc();
+  }else if(t.id==='ccat'){state.ccat=t.value;renderCalcBody();}
 });
 var qT=null;
 $('#q').addEventListener('input',function(e){
@@ -881,6 +1189,7 @@ if(state.tilt){
     }
   });
 }
+if(state.cur!=='TWD') loadFx(false);
 renderChips();renderTabbar();setTab('home');
 })();
 </script>
