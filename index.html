@@ -639,11 +639,16 @@ function feeRate(e){
 function n1(x){return (Math.round(x*10)/10).toLocaleString('zh-TW',{maximumFractionDigits:1});}
 function n0(x){return Math.round(x).toLocaleString('zh-TW');}
 function nA(x){return x.toLocaleString('zh-TW',{maximumFractionDigits:2});}
-function ptsText(rate){var n=ntd();return n?'約 '+n1(n*rate/100)+' 點':'';}
+/* 官方注意事項「回饋方式」：正附卡交易採逐筆(小數點後無條件捨去)計算台新Point(信用卡)回饋 */
+function rawPts(n,rate){return Math.round(n*rate*100)/10000;}
+function ptsOf(n,rate){return Math.floor(rawPts(n,rate));}
+function approx(){return fxOn()?'約 ':'';}
+function ptsText(rate){var n=ntd();return n?approx()+ptsOf(n,rate).toLocaleString('zh-TW')+' 點':'';}
 function formulaText(rate,fee){
   var a=amt(); if(!a) return '輸入上方金額，可試算回饋點數';
   var n=ntd(); if(!n) return '匯率取得中，暫無法換算';
-  var pts=n*rate/100, s=(fxOn()?curOf(state.cur)[2]+nA(a)+' ≈ NT$'+n0(n):'NT$'+nA(a))+' × '+fmt(rate)+'% = 約 '+n1(pts)+' 點';
+  var raw=rawPts(n,rate),pts=ptsOf(n,rate);
+  var s=(fxOn()?curOf(state.cur)[2]+nA(a)+' ≈ NT$'+n0(n):'NT$'+nA(a))+' × '+fmt(rate)+'% = '+nA(raw)+' → '+approx()+pts.toLocaleString('zh-TW')+' 點（無條件捨去）';
   if(fxOn()){
     if(fee){var f=n*fee/100;s+='；國外交易手續費 '+fee+'% ≈ NT$'+n1(f)+'；淨回饋約 '+n1(pts-f);}
     else s+='；台新Pay+ 日韓交易免1.5%國外交易手續費';
@@ -856,7 +861,7 @@ function renderCalcBody(){
     if(p.id==='holiday'&&HOLIDAY) c.push({e:HOLIDAY,rate:rateOf(p,HOLIDAY.g.r),hol:true});
     c.sort(function(x,y){return y.rate-x.rate;});
     var b=c[0]||{e:null,rate:0.3,base:true};
-    var fr=feeRate(b.e),pts=n*b.rate/100,fee=n*fr/100;
+    var fr=feeRate(b.e),pts=n?ptsOf(n,b.rate):0,fee=n*fr/100;
     list.push({p:p,b:b,fr:fr,pts:pts,fee:fee,net:pts-fee});
   });
   list.sort(function(x,y){return (on?y.net-x.net:y.pts-x.pts)||(y.b.rate-x.b.rate)||PLANS.indexOf(x.p)-PLANS.indexOf(y.p);});
@@ -876,13 +881,13 @@ function renderCalcBody(){
     var sub=b.base?'非指定通路，以一般消費 0.3% 計算':(b.hol?'節假日不限通路(含保費)消費':esc(b.e.item)+'・'+esc(b.e.g.t));
     h+='<div class="panel c-row'+(i===0&&n?' vitrine':'')+'"><div class="c-head"><span class="swatch" style="--g:'+p.g+'"></span><div class="c-main"><b>'+esc(p.fixed?'免切換':p.name)+'</b><div class="res-sub">'+sub+'</div>'+(tags?'<div class="res-tags">'+tags+'</div>':'')+'</div><span class="rate-pill num">'+fmt(b.rate)+'<small>%</small></span></div>';
     if(n){
-      h+='<dl class="c-fig"><dt>回饋</dt><dd class="num">約 '+n1(x.pts)+' 點</dd>';
+      h+='<dl class="c-fig"><dt>回饋</dt><dd class="num">'+approx()+x.pts.toLocaleString('zh-TW')+' 點</dd>';
       if(on) h+='<dt>手續費 '+x.fr+'%</dt><dd class="num">NT$'+n1(x.fee)+'</dd><dt>淨回饋</dt><dd class="num'+(x.net<0?' neg':'')+'"><b>約 '+n1(x.net)+'</b></dd>';
       h+='</dl>';
     }
     h+='</div>';
   });
-  h+='<p class="src" style="margin-top:12px">試算為約略值，回饋以台新Point(信用卡)計，點數進位方式以台新銀行計算為準。'+(on?'淨回饋以 1 點折合 NT$1 估算；國外交易手續費 1.5%，台新Pay+ 日韓交易依官方「免1.5%國外交易手續費」以 0 計。':'')+
+  h+='<p class="src" style="margin-top:12px">回饋以台新Point(信用卡)計，依官方注意事項「回饋方式」逐筆(小數點後無條件捨去)計算；實際以台新銀行入帳為準。'+(on?'淨回饋以 1 點折合 NT$1 估算；國外交易手續費 1.5%，台新Pay+ 日韓交易依官方「免1.5%國外交易手續費」以 0 計。':'')+
      '<br>資料來源：<a href="'+SRC+'" target="_blank" rel="noopener">台新銀行 Richart卡活動頁</a>'+(on?'；匯率：<a href="'+FX_SITE+'" target="_blank" rel="noopener">ExchangeRate-API</a>':'')+'</p>';
   box.innerHTML=h;
 }
