@@ -309,7 +309,7 @@ var store={
 };
 var state={
  theme:store.get('theme','auto'), level:store.get('level',2), main:store.get('main',null), favs:store.get('favs',[]),
- geo:store.get('geo',null), tab:'home', q:'', cat:'all', open:null, flip:false
+ geo:store.get('geo',null), tilt:store.get('tilt',false), tab:'home', q:'', cat:'all', open:null, flip:false
 };
 var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -395,30 +395,78 @@ function requestGeo(force){
 }
 
 /* ---------- 卡面 ---------- */
+var CHIP='<svg viewBox="0 0 40 30" fill="none" stroke="rgba(95,62,15,.5)" stroke-width=".8" aria-hidden="true"><rect x="13" y="8" width="14" height="14" rx="2.5"/><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 15H0M27 15h13M20 0v8M20 22v8"/></svg>';
+function topGroups(p){
+  var seen={},out=[];
+  p.groups.slice().sort(function(a,b){return b.r-a.r;}).forEach(function(g){if(!seen[g.t]){seen[g.t]=1;out.push(g);}});
+  return out.slice(0,3);
+}
 function cardHTML(p,opts){
   opts=opts||{};
-  var st=status(p),mx=maxOf(p);
-  var sum=p.groups.map(function(g){return g.t;}).filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,5).join('、');
+  var st=status(p),mx=maxOf(p),layers='<span class="tex"></span><span class="holo"></span><span class="glare"></span>';
+  var list=topGroups(p).map(function(g){return '<li><span class="lr num">'+fmt(rateOf(p,g.r))+'%</span><span class="lt">'+esc(g.t)+'</span></li>';}).join('');
   var attrs=opts.act?(' role="button" tabindex="0" data-act="'+opts.act+'" data-pid="'+p.id+'" aria-label="'+esc(p.name+(opts.label||''))+'"'):'';
   return ''+
   '<div class="card'+(opts.flipped?' flipped':'')+'" style="--g:'+p.g+'"'+attrs+'>'+
    '<div class="card-inner">'+
-    '<div class="face front">'+
+    '<div class="face front">'+layers+
      '<div class="f-top"><div class="f-name">'+esc(p.name)+'</div>'+
       '<div class="f-rate"><small>最高</small><span class="n num">'+fmt(mx)+'</span><span class="pct num">%</span></div></div>'+
-     '<div class="f-mid"><span class="emv"></span>'+icon('nfc','nfc')+'</div>'+
-     '<div class="f-bottom"><div class="f-tagline">'+esc(p.tagline)+'</div>'+
+     '<div class="f-mid"><div class="f-chip"><span class="emv">'+CHIP+'</span>'+icon('nfc','nfc')+'</div>'+
       '<div class="f-brand"><b>Richart</b>台新銀行</div></div>'+
+     '<ul class="f-list">'+list+'</ul>'+
      '<div class="f-bar '+st.bar+'" title="有效期已過 '+Math.round(st.pct)+'%"><i style="width:'+st.pct.toFixed(1)+'%"></i></div>'+
     '</div>'+
-    '<div class="face back" aria-hidden="true">'+
+    '<div class="face back" aria-hidden="true">'+layers+
      '<div class="stripe"></div>'+
-     '<div class="sig"><span>'+dstr(p.period[0])+' – '+dstr(p.period[1])+'</span><span class="cvv num">'+fmt(mx)+'%</span></div>'+
-     '<div class="b-sum"><b>分類</b>　'+esc(sum)+'</div>'+
-     '<div class="b-foot"><span class="st '+st.bar+'">'+esc(st.t)+'</span><span>LEVEL '+state.level+'</span></div>'+
+     '<dl class="b-info">'+
+      '<dt>期間</dt><dd>'+dstr(p.period[0])+' – '+dstr(p.period[1])+'<span class="b-st '+st.bar+'">'+esc(st.t)+'</span></dd>'+
+      '<dt>支付</dt><dd>'+esc(p.pay)+'</dd>'+
+      '<dt>標語</dt><dd>'+esc(p.tagline)+'</dd>'+
+     '</dl>'+
+     '<div class="b-foot"><span>'+(p.notes.length?'注意事項 '+p.notes.length+' 條，詳見下方':'')+'</span><span>LEVEL '+state.level+'</span></div>'+
     '</div>'+
    '</div>'+
   '</div>';
+}
+
+/* ---------- 全像光澤：觸控／滑鼠／手機傾斜 ---------- */
+var tiltOn=false,tiltRAF=0,tiltXY=null;
+function setGlint(el,x,y){el.style.setProperty('--mx',x.toFixed(1)+'%');el.style.setProperty('--my',y.toFixed(1)+'%');}
+document.addEventListener('pointermove',function(ev){
+  if(reduce||!ev.target.closest) return;
+  var c=ev.target.closest('.card');if(!c) return;
+  var r=c.getBoundingClientRect();
+  setGlint(c,(ev.clientX-r.left)/r.width*100,(ev.clientY-r.top)/r.height*100);
+},{passive:true});
+document.addEventListener('pointerout',function(ev){
+  if(!ev.target.closest) return;
+  var c=ev.target.closest('.card');
+  if(c&&!(ev.relatedTarget&&c.contains(ev.relatedTarget))){c.style.removeProperty('--mx');c.style.removeProperty('--my');}
+});
+function onOrient(e){
+  if(e.gamma==null) return;
+  var x=Math.max(-25,Math.min(25,e.gamma)),y=Math.max(10,Math.min(80,e.beta||45));
+  tiltXY=[50+x*2,(y-10)/70*100];
+  if(!tiltRAF) tiltRAF=requestAnimationFrame(function(){tiltRAF=0;setGlint(document.documentElement,tiltXY[0],tiltXY[1]);});
+}
+function enableTilt(gesture){
+  var D=window.DeviceOrientationEvent;
+  if(reduce||!D) return Promise.resolve(false);
+  var p;
+  if(typeof D.requestPermission==='function'){
+    if(!gesture) return Promise.resolve(false);
+    try{p=D.requestPermission();}catch(e){return Promise.resolve(false);}
+  }else p=Promise.resolve('granted');
+  return p.then(function(r){
+    if(r!=='granted') return false;
+    if(!tiltOn){window.addEventListener('deviceorientation',onOrient);tiltOn=true;}
+    return true;
+  },function(){return false;});
+}
+function disableTilt(){
+  window.removeEventListener('deviceorientation',onOrient);tiltOn=false;
+  document.documentElement.style.removeProperty('--mx');document.documentElement.style.removeProperty('--my');
 }
 
 /* ---------- 類別按鈕 ---------- */
@@ -661,6 +709,8 @@ function renderSettings(){
     '<button class="opt" data-act="level" data-v="1" aria-pressed="'+(state.level===1)+'"><span><b>LEVEL 1　1.3%</b><small>台新Richart卡友 核卡消費即享</small></span></button>'+
     '<button class="opt" data-act="level" data-v="2" aria-pressed="'+(state.level===2)+'"><span><b>LEVEL 2　最高 3.8%（Chill刷 3.3%–10%）</b><small>有設定台新帳戶扣繳台新信用卡帳款 次期帳單結帳後消費享</small></span></button>'+
     '</div></div>';
+  h+='<div class="set-group"><div class="set-label">卡面光澤</div>'+
+    '<button class="opt" data-act="tilt" aria-pressed="'+state.tilt+'" style="width:100%"><span><b>'+(state.tilt?'已啟用手機傾斜光澤':'啟用手機傾斜光澤')+'</b><small>'+(reduce?'系統已開啟「減少動態效果」，光澤固定不動':'傾斜手機時卡面反光跟著移動；iPhone 需允許「動作與方向」')+'</small></span></button></div>';
   var mp=state.main?plan(state.main):null;
   h+='<div class="set-group"><div class="set-label">今日主卡</div><div class="panel" style="padding:4px 12px">'+
     '<button class="list-btn" data-act="pickmain">'+(mp?'<span class="swatch" style="--g:'+mp.g+'"></span>':'')+'<span class="lb-main"><b>'+(mp?esc(mp.name):'尚未設定')+'</b><div class="lb-sub">點此更換</div></span></button></div></div>';
@@ -701,6 +751,10 @@ document.addEventListener('click',function(ev){
     case 'close': closeSheet();break;
     case 'theme': state.theme=el.getAttribute('data-v');store.set('theme',state.theme);if(state.theme==='auto')requestGeo(true);applyTheme();renderSettings();break;
     case 'level': state.level=+el.getAttribute('data-v');store.set('level',state.level);renderSettings();renderPage(state.tab);break;
+    case 'tilt':
+      if(state.tilt){disableTilt();state.tilt=false;store.set('tilt',false);renderSettings();toast('已關閉傾斜光澤');}
+      else enableTilt(true).then(function(ok){state.tilt=ok;store.set('tilt',ok);if(sheetMode==='settings')renderSettings();toast(ok?'已啟用傾斜光澤':'無法啟用：裝置不支援或未允許');});
+      break;
     case 'clearfavs': state.favs=[];store.set('favs',[]);renderSettings();toast('已清除收藏');if(state.tab!=='home')renderPage(state.tab);break;
   }
 });
@@ -728,6 +782,13 @@ applyTheme();
 if(state.theme==='auto') requestGeo(false);
 setInterval(applyTheme,60000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)applyTheme();});
+if(state.tilt){
+  enableTilt(false).then(function(ok){
+    if(!ok&&typeof (window.DeviceOrientationEvent||{}).requestPermission==='function'){
+      document.addEventListener('click',function once(){document.removeEventListener('click',once,true);enableTilt(true);},true);
+    }
+  });
+}
 renderChips();renderTabbar();setTab('home');
 })();
 </script>
