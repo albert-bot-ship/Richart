@@ -647,11 +647,10 @@ function ptsText(rate){var n=ntd();return n?approx()+ptsOf(n,rate).toLocaleStrin
 function formulaText(rate,fee){
   var a=amt(); if(!a) return '輸入上方金額，可試算回饋點數';
   var n=ntd(); if(!n) return '匯率取得中，暫無法換算';
-  var raw=rawPts(n,rate),pts=ptsOf(n,rate);
-  var s=(fxOn()?curOf(state.cur)[2]+nA(a)+' ≈ NT$'+n0(n):'NT$'+nA(a))+' × '+fmt(rate)+'% = '+nA(raw)+' → '+approx()+pts.toLocaleString('zh-TW')+' 點（無條件捨去）';
+  var pts=ptsOf(n,rate),s='回饋 '+approx()+pts.toLocaleString('zh-TW')+' 點';
   if(fxOn()){
-    if(fee){var f=n*fee/100;s+='；國外交易手續費 '+fee+'% ≈ NT$'+n1(f)+'；淨回饋約 '+n1(pts-f);}
-    else s+='；台新Pay+ 日韓交易免1.5%國外交易手續費';
+    if(fee){var f=n*fee/100;s+='・手續費 NT$'+n1(f)+'・淨回饋約 '+n1(pts-f);}
+    else s+='・免國外交易手續費';
   }
   return s;
 }
