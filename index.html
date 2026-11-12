@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
-<link rel="stylesheet" href="style.css?v=20261112">
+<link rel="stylesheet" href="style.css?v=20261112b">
 <script>
 /* 先套用主題，避免開啟時閃白 */
 (function(){try{
@@ -645,19 +645,20 @@ function ptsOf(n,rate){return Math.floor(rawPts(n,rate));}
 function approx(){return fxOn()?'約 ':'';}
 function ptsText(rate){var n=ntd();return n?approx()+ptsOf(n,rate).toLocaleString('zh-TW')+' 點':'';}
 function formulaText(rate,fee){
-  var a=amt(); if(!a) return '輸入上方金額，可試算回饋點數';
-  var n=ntd(); if(!n) return '匯率取得中，暫無法換算';
-  var pts=ptsOf(n,rate),s='回饋 '+approx()+pts.toLocaleString('zh-TW')+' 點';
+  var a=amt(); if(!a) return '<span class="pt-hint">輸入上方金額，可試算回饋點數</span>';
+  var n=ntd(); if(!n) return '<span class="pt-hint">匯率取得中，暫無法換算</span>';
+  var pts=ptsOf(n,rate);
+  var s='<span class="pt-l">回饋</span>'+(fxOn()?'<span class="pt-a">約</span>':'')+'<b class="pt-n num">'+pts.toLocaleString('zh-TW')+'</b><span class="pt-u">點</span>';
   if(fxOn()){
-    if(fee){var f=n*fee/100;s+='・手續費 NT$'+n1(f)+'・淨回饋約 '+n1(pts-f);}
-    else s+='・免國外交易手續費';
+    if(fee){var f=n*fee/100;s+='<span class="pt-x">手續費 NT$'+n1(f)+'・淨回饋約 <b>'+n1(pts-f)+'</b></span>';}
+    else s+='<span class="pt-x">免國外交易手續費</span>';
   }
   return s;
 }
 function updateAmts(){
   $$('[data-rate]').forEach(function(el){
     var r=parseFloat(el.getAttribute('data-rate'));
-    if(el.hasAttribute('data-formula')) el.textContent=formulaText(r,parseFloat(el.getAttribute('data-fee')||'0'));
+    if(el.hasAttribute('data-formula')) el.innerHTML=formulaText(r,parseFloat(el.getAttribute('data-fee')||'0'));
     else el.textContent=ptsText(r);
   });
 }
