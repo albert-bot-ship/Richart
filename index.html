@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
-<link rel="stylesheet" href="style.css?v=20261112b">
+<link rel="stylesheet" href="style.css?v=20261112c">
 <script>
 /* 先套用主題，避免開啟時閃白 */
 (function(){try{
@@ -324,6 +324,7 @@ var IC={
  wallet:'<path d="M4 7.5h15.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 7.5 15 4l1.2 3.5M16.5 14h.01"/>',
  star:'<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
  calc:'<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 6.5h7v3h-7zM9 13h.01M12 13h.01M15 13h.01M9 16.5h.01M12 16.5h.01M15 16.5h.01"/>',
+ clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
  sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4"/><circle cx="15" cy="7" r="0"/>',
  close:'<path d="M6 6l12 12M18 6 6 18"/>',
  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
@@ -341,7 +342,7 @@ var store={
 };
 var state={
  theme:store.get('theme','auto'), level:store.get('level',2), main:store.get('main',null), favs:store.get('favs',[]),
- geo:store.get('geo',null), tilt:store.get('tilt',false), wmode:store.get('wmode','stack'), hview:null, amt:'', cur:store.get('cur','TWD'), cq:'', ccat:'all', qfavs:store.get('qfavs',[]), tab:'home', q:'', cat:'all', open:null, flip:false
+ geo:store.get('geo',null), wmode:store.get('wmode','stack'), hview:null, amt:'', cur:store.get('cur','TWD'), cq:'', ccat:'all', qfavs:store.get('qfavs',[]), tab:'home', q:'', cat:'all', open:null, flip:false
 };
 var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -483,7 +484,6 @@ function cardHTML(p,opts){
 }
 
 /* ---------- 全像光澤：觸控／滑鼠／手機傾斜 ---------- */
-var tiltOn=false,tiltRAF=0,tiltXY=null;
 function setGlint(el,x,y){el.style.setProperty('--mx',x.toFixed(1)+'%');el.style.setProperty('--my',y.toFixed(1)+'%');}
 document.addEventListener('pointermove',function(ev){
   if(reduce||!ev.target.closest) return;
@@ -496,30 +496,6 @@ document.addEventListener('pointerout',function(ev){
   var c=ev.target.closest('.card');
   if(c&&!(ev.relatedTarget&&c.contains(ev.relatedTarget))){c.style.removeProperty('--mx');c.style.removeProperty('--my');}
 });
-function onOrient(e){
-  if(e.gamma==null) return;
-  var x=Math.max(-25,Math.min(25,e.gamma)),y=Math.max(10,Math.min(80,e.beta||45));
-  tiltXY=[50+x*2,(y-10)/70*100];
-  if(!tiltRAF) tiltRAF=requestAnimationFrame(function(){tiltRAF=0;setGlint(document.documentElement,tiltXY[0],tiltXY[1]);});
-}
-function enableTilt(gesture){
-  var D=window.DeviceOrientationEvent;
-  if(reduce||!D) return Promise.resolve(false);
-  var p;
-  if(typeof D.requestPermission==='function'){
-    if(!gesture) return Promise.resolve(false);
-    try{p=D.requestPermission();}catch(e){return Promise.resolve(false);}
-  }else p=Promise.resolve('granted');
-  return p.then(function(r){
-    if(r!=='granted') return false;
-    if(!tiltOn){window.addEventListener('deviceorientation',onOrient);tiltOn=true;}
-    return true;
-  },function(){return false;});
-}
-function disableTilt(){
-  window.removeEventListener('deviceorientation',onOrient);tiltOn=false;
-  document.documentElement.style.removeProperty('--mx');document.documentElement.style.removeProperty('--my');
-}
 
 /* ---------- 左右滑動輪播 ---------- */
 function railIndex(rail){
@@ -559,13 +535,16 @@ function renderHome(){
     }).join('')+'</div>';
     h+=dotsHTML('homeDots',vi);
     h+='<div class="h-set" id="homeSet"></div>';
-    h+='<div class="main-meta"><span>每日23:59前於 Richart Life App 切換，每日限轉換一次</span><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>';
-    h+='<h2 class="sec-title">'+esc(p.name)+' 適用通路</h2><div class="panel vitrine">';
+    /* 今日主卡內容：沿用最佳選擇外框 */
+    h+='<section class="best-card today-card" aria-label="今日主卡內容"><div class="bc-top"><span class="badge-best">今日主卡</span><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>'+
+      '<div class="tc-name"><span class="swatch" style="--g:'+p.g+'"></span><b>'+esc(p.name)+'</b><span class="tc-max">最高<b class="num">'+fmt(maxOf(p))+'%</b></span></div>'+
+      '<p class="tc-switch">'+icon('clock')+'<span>每日23:59前於 Richart Life App 切換，每日限轉換一次</span></p>'+
+      '<div class="bc-list"><div class="tc-h">適用通路</div>';
     p.groups.forEach(function(g){
       var items=g.items.slice(0,8).join('、')+(g.items.length>8?' 等 '+g.items.length+' 家':'');
-      h+='<div class="g-row"><div class="g-main"><div class="g-t">'+esc(g.t)+'</div><div class="g-i">'+esc(items)+'</div></div><span class="rate-pill num">'+fmt(rateOf(p,g.r))+'<small>%</small></span></div>';
+      h+='<div class="tc-g"><div class="g-main"><div class="g-t">'+esc(g.t)+'</div><div class="g-i">'+esc(items)+'</div></div><span class="tc-rate num">'+fmt(rateOf(p,g.r))+'<small>%</small></span></div>';
     });
-    h+='<div class="d-actions"><button class="btn ghost" data-act="viewplan" data-pid="'+p.id+'">查看完整內容與注意事項</button></div></div>';
+    h+='</div><div class="d-actions"><button class="btn ghost" data-act="viewplan" data-pid="'+p.id+'">查看完整內容與注意事項</button></div></section>';
   }else{
     h+='<button class="card-empty" data-act="pickmain"><span>'+icon('plus')+'<b>設定今日主卡</b>選擇今天在 Richart Life App 切換的方案</span></button>';
   }
@@ -1080,8 +1059,6 @@ function renderSettings(){
     '<button class="opt" data-act="level" data-v="1" aria-pressed="'+(state.level===1)+'"><span><b>LEVEL 1　1.3%</b><small>台新Richart卡友 核卡消費即享</small></span></button>'+
     '<button class="opt" data-act="level" data-v="2" aria-pressed="'+(state.level===2)+'"><span><b>LEVEL 2　最高 3.8%（Chill刷 3.3%–10%）</b><small>有設定台新帳戶扣繳台新信用卡帳款 次期帳單結帳後消費享</small></span></button>'+
     '</div></div>';
-  h+='<div class="set-group"><div class="set-label">卡面光澤</div>'+
-    '<button class="opt" data-act="tilt" aria-pressed="'+state.tilt+'" style="width:100%"><span><b>'+(state.tilt?'已啟用手機傾斜光澤':'啟用手機傾斜光澤')+'</b><small>'+(reduce?'系統已開啟「減少動態效果」，光澤固定不動':'傾斜手機時卡面反光跟著移動；iPhone 需允許「動作與方向」')+'</small></span></button></div>';
   var mp=state.main?plan(state.main):null;
   h+='<div class="set-group"><div class="set-label">今日主卡</div><div class="panel" style="padding:4px 12px">'+
     '<button class="list-btn" data-act="pickmain">'+(mp?'<span class="swatch" style="--g:'+mp.g+'"></span>':'')+'<span class="lb-main"><b>'+(mp?esc(mp.name):'尚未設定')+'</b><div class="lb-sub">點此更換</div></span></button></div></div>';
@@ -1133,10 +1110,6 @@ document.addEventListener('click',function(ev){
     case 'close': closeSheet();break;
     case 'theme': state.theme=el.getAttribute('data-v');store.set('theme',state.theme);if(state.theme==='auto')requestGeo(true);applyTheme();renderSettings();break;
     case 'level': state.level=+el.getAttribute('data-v');store.set('level',state.level);renderSettings();renderPage(state.tab);break;
-    case 'tilt':
-      if(state.tilt){disableTilt();state.tilt=false;store.set('tilt',false);renderSettings();toast('已關閉傾斜光澤');}
-      else enableTilt(true).then(function(ok){state.tilt=ok;store.set('tilt',ok);if(sheetMode==='settings')renderSettings();toast(ok?'已啟用傾斜光澤':'無法啟用：裝置不支援或未允許');});
-      break;
     case 'qfav':
       var qq=el.getAttribute('data-q'),qi=state.qfavs.indexOf(qq);
       if(qi>-1)state.qfavs.splice(qi,1);else state.qfavs.unshift(qq);
@@ -1196,13 +1169,7 @@ applyTheme();
 if(state.theme==='auto') requestGeo(false);
 setInterval(applyTheme,60000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)applyTheme();});
-if(state.tilt){
-  enableTilt(false).then(function(ok){
-    if(!ok&&typeof (window.DeviceOrientationEvent||{}).requestPermission==='function'){
-      document.addEventListener('click',function once(){document.removeEventListener('click',once,true);enableTilt(true);},true);
-    }
-  });
-}
+try{localStorage.removeItem('rc.tilt');}catch(e){}
 if(state.cur!=='TWD') loadFx(false);
 renderChips();renderTabbar();setTab('home');
 })();
