@@ -623,3 +623,27 @@ mark{
 [data-theme="luxe"] .bc-fav.on{color:#E3A79A}
 [data-theme="luxe"] .best-card .why .q b{color:#F4EEE3}
 [data-theme="luxe"] .best-card .why summary,[data-theme="luxe"] .best-card .why a{color:#E2C893}
+
+/* ---------- 首頁今日主卡內容（沿用最佳選擇外框） ---------- */
+.today-card{margin-top:6px}
+.tc-name{display:flex;align-items:center;gap:10px;margin:12px 0 10px}
+.tc-name .swatch{width:40px;height:26px}
+.tc-name > b{font-family:var(--font-head);letter-spacing:var(--head-track);font-size:24px;font-weight:800;line-height:1.2}
+.tc-max{margin-left:auto;display:flex;align-items:baseline;gap:4px;font-size:13px;color:var(--bc-text-2);white-space:nowrap}
+.tc-max b{font-size:24px;font-weight:800;color:var(--pt)}
+.tc-switch{display:flex;align-items:flex-start;gap:8px;margin:0 0 14px;padding:10px 12px;border-radius:12px;background:var(--bc-surface);font-size:14.5px;font-weight:700;line-height:1.5}
+.tc-switch svg{flex:none;width:20px;height:20px;margin-top:1px;color:var(--pt)}
+.tc-h{padding:12px 0 2px;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--bc-text-2)}
+.tc-g{display:flex;align-items:center;gap:12px;padding:11px 0}
+.tc-g + .tc-g{border-top:1px dashed var(--bc-line)}
+.tc-g .g-main{flex:1;min-width:0}
+.tc-g .g-t{font-size:16px;font-weight:800}
+.tc-g .g-i{font-size:13.5px;color:var(--bc-text-2);margin-top:2px}
+.tc-rate{flex:none;font-size:28px;font-weight:800;line-height:1;color:var(--pt);white-space:nowrap}
+.tc-rate small{font-size:15px;margin-left:1px}
+.today-card .d-actions{margin:8px 0 6px}
+.today-card .btn.ghost{color:#6EA8FF;border-color:var(--bc-line)}
+[data-theme="light"] .today-card .btn.ghost{color:#2E6BDC}
+[data-theme="luxe"] .tc-switch{border-radius:0;border:1px solid var(--bc-line)}
+[data-theme="luxe"] .tc-max b,[data-theme="luxe"] .tc-rate{font-family:"Bodoni Moda","Didot",serif;font-style:italic;font-weight:700}
+[data-theme="luxe"] .today-card .btn.ghost{color:#E2C893}
