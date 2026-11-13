@@ -129,7 +129,8 @@ svg{display:block}
 .icon-btn{width:var(--tap);height:var(--tap);display:grid;place-items:center;border-radius:12px;color:var(--text)}
 .icon-btn svg{width:24px;height:24px}
 
-.search{position:relative;margin:4px 16px 0;display:flex;align-items:center}
+.search{margin:4px 16px 0;display:flex;align-items:center;gap:8px}
+.search-box{position:relative;flex:1;min-width:0;display:flex;align-items:center}
 .search svg{position:absolute;left:12px;width:20px;height:20px;color:var(--text-2);pointer-events:none}
 .search input{
   width:100%;height:var(--tap);padding:0 44px 0 40px;
@@ -195,7 +196,6 @@ main{
   border-radius:0;padding:1px 14px 1px 8px;
   clip-path:polygon(0 0,100% 0,calc(100% - 6px) 50%,100% 100%,0 100%);
 }
-[data-theme="luxe"] .tag.gold{background:linear-gradient(135deg,#B8995F,#F0DBA9);color:#120D12}
 
 .rate-pill{
   flex:none;min-width:58px;text-align:center;padding:3px 8px;border-radius:999px;
@@ -330,12 +330,6 @@ mark{
 [data-theme="luxe"] .card-empty{border-radius:2px;border-color:rgba(216,190,138,.45)}
 
 /* ---------- 首頁 ---------- */
-.main-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:var(--text-2)}
-.g-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
-.g-row:first-child{border-top:0;padding-top:2px}
-.g-row .g-main{flex:1;min-width:0}
-.g-row .g-t{font-weight:700}
-.g-row .g-i{font-size:13px;color:var(--text-2);margin-top:2px}
 .alert-row{display:flex;align-items:center;gap:12px;min-height:var(--tap);width:100%;text-align:left}
 .swatch{flex:none;width:34px;height:22px;border-radius:4px;background:var(--g);box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
 [data-theme="luxe"] .swatch{border-radius:1px;box-shadow:inset 0 0 0 1px rgba(240,219,169,.6)}
@@ -647,3 +641,29 @@ mark{
 [data-theme="luxe"] .tc-switch{border-radius:0;border:1px solid var(--bc-line)}
 [data-theme="luxe"] .tc-max b,[data-theme="luxe"] .tc-rate{font-family:"Bodoni Moda","Didot",serif;font-style:italic;font-weight:700}
 [data-theme="luxe"] .today-card .btn.ghost{color:#E2C893}
+
+/* ---------- 搜尋欄重置 ---------- */
+.reset-btn{
+  flex:none;height:var(--tap);padding:0 14px;border-radius:var(--radius-sm);
+  border:1px solid var(--line-strong);background:var(--surface);color:var(--accent);font-weight:700;font-size:14px;
+}
+[data-theme="luxe"] .reset-btn{font-family:var(--font-head);letter-spacing:.08em}
+
+/* ---------- 假日刷提示 ---------- */
+.hol-banner{
+  display:flex;align-items:center;gap:12px;margin:8px 0 4px;padding:12px 14px;
+  border-radius:var(--radius);border:1.5px solid var(--warn);background:var(--warn-bg);
+}
+.hol-banner .hb-main{flex:1;min-width:0;font-size:14px;line-height:1.45}
+.hol-banner .hb-main b{display:block;font-size:15.5px}
+.hol-banner small{display:block;margin-top:2px;font-size:11.5px;color:var(--text-2)}
+.hb-rate{font-size:20px;font-weight:800;color:var(--pt)}
+.hol-banner .btn{flex:none;min-height:40px;padding:0 14px}
+[data-theme="luxe"] .hol-banner{border-radius:2px;border-width:1px}
+.today-line.hol{border-color:var(--warn);background:var(--warn-bg)}
+
+/* ---------- 試算頁設為今日主卡 ---------- */
+.btn.sm{min-height:38px;padding:0 14px;font-size:13.5px}
+.c-act{display:flex;justify-content:flex-end;margin-top:10px}
+.today-card.browsing .badge-best{background:#6B7280}
+[data-theme="luxe"] .today-card.browsing .badge-best{background:linear-gradient(135deg,#7A6A4F,#B8A47E)}
