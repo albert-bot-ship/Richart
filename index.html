@@ -9,19 +9,28 @@
 <meta name="apple-mobile-web-app-title" content="Richart權益">
 <meta name="theme-color" content="#07070F">
 <title>Richart 權益查詢</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,500;1,6..96,700&family=Noto+Serif+TC:wght@600;700;900&display=swap">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
-<link rel="stylesheet" href="style.css?v=20261112c">
+<link rel="stylesheet" href="style.css?v=20261113">
 <script>
-/* 先套用主題，避免開啟時閃白 */
+/* 典藏主題字型：只有使用典藏主題時才下載 */
+window.rcLuxeFonts=function(){
+  if(document.getElementById('luxeFonts')) return;
+  var l=document.createElement('link');l.id='luxeFonts';l.rel='stylesheet';
+  l.href='https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,500;1,6..96,700&family=Noto+Serif+TC:wght@600;700;900&display=swap';
+  document.head.appendChild(l);
+};
+/* 先套用主題，避免開啟時閃動：自動模式使用上次算好的今日日出日落時間 */
 (function(){try{
-  var p=JSON.parse(localStorage.getItem('rc.theme')||'"auto"');
-  var h=new Date().getHours();
-  document.documentElement.setAttribute('data-theme', p==='auto' ? (h>=6&&h<18?'light':'dark') : p);
+  var p=JSON.parse(localStorage.getItem('rc.theme')||'"auto"'),t=p,d=new Date();
+  if(p==='auto'){
+    var s=JSON.parse(localStorage.getItem('rc.sun')||'null'),k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+    if(s&&s.d===k) t=(d.getTime()>=s.r&&d.getTime()<s.s)?'light':'dark';
+    else{var hr=d.getHours();t=(hr>=6&&hr<18)?'light':'dark';}
+  }
+  document.documentElement.setAttribute('data-theme',t);
+  if(t==='luxe') window.rcLuxeFonts();
 }catch(e){}})();
 </script>
 </head>
@@ -35,9 +44,12 @@
       <button class="icon-btn" data-act="settings" aria-label="設定" id="btnSettings"></button>
     </div>
     <div class="search" role="search">
-      <span id="searchIcon"></span>
-      <input id="q" type="search" placeholder="搜尋商家名稱" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="搜尋商家名稱">
-      <button class="clear" id="btnClear" data-act="clearq" aria-label="清除搜尋" hidden></button>
+      <div class="search-box">
+        <span id="searchIcon"></span>
+        <input id="q" type="search" placeholder="搜尋商家名稱" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="搜尋商家名稱">
+        <button class="clear" id="btnClear" data-act="clearq" aria-label="清除搜尋文字" hidden></button>
+      </div>
+      <button class="reset-btn" id="btnReset" data-act="reset" aria-label="重置搜尋、類別與試算金額" hidden>重置</button>
     </div>
     <nav class="chips" id="chips" aria-label="類別"></nav>
   </div>
@@ -247,6 +259,22 @@ var PLANS=[
  ]}
 ];
 
+/* 國定假日：依行政院人事行政總處公告之115年、116年政府行政機關辦公日曆表
+   （含補假；自115年起不再有補行上班日）。一般週六、週日另由程式判斷。 */
+var HOL={
+ '2026-12-25':'行憲紀念日',
+ '2027-01-01':'開國紀念日',
+ '2027-02-04':'小年夜','2027-02-05':'除夕','2027-02-06':'春節','2027-02-07':'春節','2027-02-08':'春節',
+ '2027-02-09':'春節補假','2027-02-10':'春節補假',
+ '2027-02-28':'和平紀念日','2027-03-01':'和平紀念日補假',
+ '2027-04-04':'兒童節','2027-04-05':'清明節','2027-04-06':'兒童節補假',
+ '2027-04-30':'勞動節補假','2027-05-01':'勞動節',
+ '2027-06-09':'端午節','2027-09-15':'中秋節','2027-09-28':'孔子誕辰紀念日',
+ '2027-10-10':'國慶日','2027-10-11':'國慶日補假','2027-10-25':'臺灣光復暨金門古寧頭大捷紀念日',
+ '2027-12-24':'行憲紀念日補假','2027-12-25':'行憲紀念日','2027-12-31':'開國紀念日補假'
+};
+var HOL_SRC='https://www.dgpa.gov.tw/information?uid=30&pid=12982';
+
 /* 免切換常態回饋（不放進錢包，只出現在搜尋） */
 var BASE={id:'base',name:'免切換',fixed:true,max:1.3,period:P7,
  g:'linear-gradient(135deg,#3B3F4A,#7A808C)',
@@ -430,12 +458,18 @@ function sunToday(){
   var loc=state.geo||TAICHUNG,now=new Date();
   return {rise:sunEvent(now,loc.lat,loc.lng,true),set:sunEvent(now,loc.lat,loc.lng,false),src:state.geo?'目前定位':'台中'};
 }
-function isDay(){var s=sunToday(),n=new Date();if(!s.rise||!s.set){var h=n.getHours();return h>=6&&h<18;}return n>=s.rise&&n<s.set;}
+function isDay(){
+  var s=sunToday(),n=new Date();
+  if(!s.rise||!s.set){var h=n.getHours();return h>=6&&h<18;}
+  store.set('sun',{d:n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate(),r:s.rise.getTime(),s:s.set.getTime()});
+  return n>=s.rise&&n<s.set;
+}
 function hm(d){return d?('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2):'--:--';}
 function resolvedTheme(){return state.theme==='auto'?(isDay()?'light':'dark'):state.theme;}
 function applyTheme(){
   var t=resolvedTheme();
   if(document.documentElement.getAttribute('data-theme')!==t) document.documentElement.setAttribute('data-theme',t);
+  if(t==='luxe'&&window.rcLuxeFonts) window.rcLuxeFonts();
 }
 function requestGeo(force){
   if(!('geolocation' in navigator)) return;
@@ -525,8 +559,29 @@ function renderChips(){
 }
 
 /* ---------- 首頁 ---------- */
+/* 今日主卡內容：沿用最佳選擇外框；滑到其他卡時顯示「瀏覽中」 */
+function todayCardHTML(p){
+  var st=status(p),isMain=p.id===state.main;
+  var h='<section class="best-card today-card'+(isMain?'':' browsing')+'" aria-label="'+esc(p.name)+(isMain?' 今日主卡內容':' 瀏覽中')+'"><div class="bc-top"><span class="badge-best">'+(isMain?'今日主卡':'瀏覽中')+'</span><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>'+
+    '<div class="tc-name"><span class="swatch" style="--g:'+p.g+'"></span><b>'+esc(p.name)+'</b><span class="tc-max">最高<b class="num">'+fmt(maxOf(p))+'%</b></span></div>'+
+    '<p class="tc-switch">'+icon('clock')+'<span>每日23:59前於 Richart Life App 切換，每日限轉換一次</span></p>'+
+    '<div class="bc-list"><div class="tc-h">適用通路</div>';
+  p.groups.forEach(function(g){
+    var items=g.items.slice(0,8).join('、')+(g.items.length>8?' 等 '+g.items.length+' 家':'');
+    h+='<div class="tc-g"><div class="g-main"><div class="g-t">'+esc(g.t)+'</div><div class="g-i">'+esc(items)+'</div></div><span class="tc-rate num">'+fmt(rateOf(p,g.r))+'<small>%</small></span></div>';
+  });
+  return h+'</div><div class="d-actions"><button class="btn ghost" data-act="viewplan" data-pid="'+p.id+'">查看完整內容與注意事項</button></div></section>';
+}
+var homeRO=null,walletRO=null;
+function railKeep(rail,getIdx,old){
+  if(old) old.disconnect();
+  if(!window.ResizeObserver) return null;
+  var w=rail.clientWidth,ro=new ResizeObserver(function(){if(rail.clientWidth!==w){w=rail.clientWidth;railGo(rail,getIdx(),false);}});
+  ro.observe(rail);return ro;
+}
 function renderHome(){
   var p=state.main?plan(state.main):null,h='';
+  h+=holBannerHTML();
   h+='<h2 class="sec-title">今日主卡<span class="aside">'+(p?'左右滑動瀏覽，點卡片開啟清單':'點卡片設定')+'</span></h2>';
   if(p){
     var st=status(p),vi=pidIndex(state.hview||state.main);
@@ -535,16 +590,7 @@ function renderHome(){
     }).join('')+'</div>';
     h+=dotsHTML('homeDots',vi);
     h+='<div class="h-set" id="homeSet"></div>';
-    /* 今日主卡內容：沿用最佳選擇外框 */
-    h+='<section class="best-card today-card" aria-label="今日主卡內容"><div class="bc-top"><span class="badge-best">今日主卡</span><span class="tag '+st.k+'">'+esc(st.t)+'</span></div>'+
-      '<div class="tc-name"><span class="swatch" style="--g:'+p.g+'"></span><b>'+esc(p.name)+'</b><span class="tc-max">最高<b class="num">'+fmt(maxOf(p))+'%</b></span></div>'+
-      '<p class="tc-switch">'+icon('clock')+'<span>每日23:59前於 Richart Life App 切換，每日限轉換一次</span></p>'+
-      '<div class="bc-list"><div class="tc-h">適用通路</div>';
-    p.groups.forEach(function(g){
-      var items=g.items.slice(0,8).join('、')+(g.items.length>8?' 等 '+g.items.length+' 家':'');
-      h+='<div class="tc-g"><div class="g-main"><div class="g-t">'+esc(g.t)+'</div><div class="g-i">'+esc(items)+'</div></div><span class="tc-rate num">'+fmt(rateOf(p,g.r))+'<small>%</small></span></div>';
-    });
-    h+='</div><div class="d-actions"><button class="btn ghost" data-act="viewplan" data-pid="'+p.id+'">查看完整內容與注意事項</button></div></section>';
+    h+='<div id="homeCard">'+todayCardHTML(PLANS[vi])+'</div>';
   }else{
     h+='<button class="card-empty" data-act="pickmain"><span>'+icon('plus')+'<b>設定今日主卡</b>選擇今天在 Richart Life App 切換的方案</span></button>';
   }
@@ -564,10 +610,12 @@ function renderHome(){
     var vi2=pidIndex(state.hview||state.main);
     railGo(rail,vi2,false);homeSync(vi2);
     railBind(rail,homeSync)(vi2);
+    homeRO=railKeep(rail,function(){return pidIndex(state.hview||state.main);},homeRO);
   }
 }
 function homeSync(i){
-  var x=PLANS[i];state.hview=x.id;dotsSet('homeDots',i);
+  var x=PLANS[i],changed=state.hview!==x.id;state.hview=x.id;dotsSet('homeDots',i);
+  var card=$('#homeCard');if(card&&(changed||!card.firstChild)) card.innerHTML=todayCardHTML(x);
   var box=$('#homeSet');if(!box) return;
   box.innerHTML=x.id===state.main?'':'<button class="btn block" data-act="setmain" data-pid="'+x.id+'">設為今日主卡：'+esc(x.name)+'</button>';
 }
@@ -742,6 +790,11 @@ function rowTags(e){
   if(st.k==='danger') t+='<span class="tag danger">已結束</span>';
   return t?'<div class="res-tags">'+t+'</div>':'';
 }
+function holLine(){
+  var hd=holidayToday();if(!hd||state.main==='holiday') return '';
+  var r=rateOf(plan('holiday'),2);
+  return '<div class="today-line hol"><span class="swatch" style="--g:'+plan('holiday').g+'"></span><span class="tl-main">今天是'+esc(hd.name)+'：切換「假日刷」不限通路 <b>'+fmt(r)+'%</b>'+(fxOn()?'（海外消費是否適用，請以官方公告為準）':'')+'<small class="amt" data-rate="'+r+'"></small></span><button class="linkbtn" data-act="setmain" data-pid="holiday">切換</button></div>';
+}
 function mainLine(rows){
   if(!state.main) return '<div class="today-line"><span>尚未設定今日主卡</span><button class="linkbtn" data-act="pickmain">設定</button></div>';
   var p=plan(state.main),hit=rows.filter(function(r){return r.p===p&&!r.na;}),txt,rate;
@@ -776,8 +829,8 @@ function renderSearch(){
   }
   var rows=findRows(tq),ok=rows.filter(function(r){return !r.na;});
   var catName='';CATS.forEach(function(c){if(c[0]===state.cat)catName=c[1];});
-  h+=mainLine(rows);
-  h+='<h2 class="sec-title">'+(q?'「'+esc(q)+'」':'')+(state.cat!=='all'?(q?'・':'')+esc(catName):'')+'<span class="aside">'+rows.length+' 筆</span>'+(q&&!ok.length?qfavBtn(q):'')+'</h2>';
+  h+=mainLine(rows)+holLine();
+  h+='<h2 class="sec-title">'+(q?'「'+esc(q)+'」':'')+(state.cat!=='all'?(q?'・':'')+esc(catName):'')+'<span class="aside">'+ok.length+' 筆'+(rows.length>ok.length?'・'+(rows.length-ok.length)+' 筆不適用':'')+'</span>'+(q&&!ok.length?qfavBtn(q):'')+'</h2>';
   if(state.level===1) h+='<p class="hint" style="margin:-4px 0 10px">目前以 LEVEL 1 計算：切換刷加碼通路最高1.3%</p>';
   if(!ok.length){
     h+='<div class="panel empty"><b>找不到符合的商家</b>試試較短的關鍵字，或改用類別篩選。未列出的通路以一般消費 0.3% 計算。</div>';
@@ -873,11 +926,30 @@ function renderCalcBody(){
       if(on) h+='<dt>手續費 '+x.fr+'%</dt><dd class="num">NT$'+n1(x.fee)+'</dd><dt>淨回饋</dt><dd class="num'+(x.net<0?' neg':'')+'"><b>約 '+n1(x.net)+'</b></dd>';
       h+='</dl>';
     }
+    if(!p.fixed&&state.main!==p.id) h+='<div class="c-act"><button class="btn ghost sm" data-act="setmain" data-pid="'+p.id+'">設為今日主卡</button></div>';
     h+='</div>';
   });
   h+='<p class="src" style="margin-top:12px">回饋以台新Point(信用卡)計，依官方注意事項「回饋方式」逐筆(小數點後無條件捨去)計算；實際以台新銀行入帳為準。'+(on?'淨回饋以 1 點折合 NT$1 估算；國外交易手續費 1.5%，台新Pay+ 日韓交易依官方「免1.5%國外交易手續費」以 0 計。':'')+
      '<br>資料來源：<a href="'+SRC+'" target="_blank" rel="noopener">台新銀行 Richart卡活動頁</a>'+(on?'；匯率：<a href="'+FX_SITE+'" target="_blank" rel="noopener">ExchangeRate-API</a>':'')+'</p>';
   box.innerHTML=h;
+}
+
+/* ---------- 假日刷提示 ---------- */
+function holidayToday(){
+  var d=new Date(),k=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+  var hp=plan('holiday'),hk=hp?status(hp).k:'danger';if(hk==='danger'||hk==='neutral') return null;
+  if(HOL[k]) return {name:HOL[k],kind:'國定假日'};
+  var w=d.getDay();
+  if(w===0||w===6) return {name:w===6?'週六':'週日',kind:'例假日'};
+  return null;
+}
+function holBannerHTML(){
+  var hd=holidayToday();if(!hd) return '';
+  var hp=plan('holiday'),r=rateOf(hp,2),on=state.main==='holiday';
+  return '<div class="hol-banner"><span class="swatch" style="--g:'+hp.g+'"></span><div class="hb-main"><b>今天是'+esc(hd.name)+'（'+hd.kind+'）</b>'+
+    '<div>假日刷 不限通路 <span class="hb-rate num">'+fmt(r)+'%</span></div>'+
+    '<small>依台新公告：國內節假日依行政院人事行政總處公告之國定例假日為準(不含天災假)</small></div>'+
+    (on?'<span class="tag ok">已是今日主卡</span>':'<button class="btn" data-act="setmain" data-pid="holiday">切換</button>')+'</div>';
 }
 
 /* ---------- 錢包 ---------- */
@@ -938,6 +1010,7 @@ function renderRail(){
   $('#page-wallet').innerHTML=h;
   var rail=$('#walletRail');
   railGo(rail,cur,false);
+  walletRO=railKeep(rail,function(){return pidIndex(state.open);},walletRO);
   railBind(rail,function(i){
     if(PLANS[i].id===state.open) return;
     state.open=PLANS[i].id;state.flip=false;syncWallet();
@@ -1020,12 +1093,22 @@ function setTab(t,keepScroll){
   renderPage(t);
   if(!keepScroll) window.scrollTo(0,0);
 }
+function syncReset(){var b=$('#btnReset');if(b) b.hidden=!(state.q||state.cat!=='all'||state.amt);}
+function resetSearch(){
+  if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();
+  state.q='';state.cat='all';state.amt='';
+  $('#q').value='';$('#btnClear').hidden=true;
+  $$('.amt-in').forEach(function(x){x.value='';});
+  renderChips();syncReset();
+  if(state.tab==='search'){renderSearch();window.scrollTo(0,0);} else renderPage(state.tab);
+  toast('已重置搜尋與試算金額');
+}
 function setQuery(v){
-  state.q=v;$('#q').value=v;$('#btnClear').hidden=!v;
+  state.q=v;$('#q').value=v;$('#btnClear').hidden=!v;syncReset();
   if(state.tab!=='search') setTab('search'); else renderSearch();
 }
 function setCat(c){
-  state.cat=(state.cat===c&&c!=='all')?'all':c;renderChips();
+  state.cat=(state.cat===c&&c!=='all')?'all':c;renderChips();syncReset();
   if(state.tab!=='search') setTab('search'); else {renderSearch();window.scrollTo(0,0);}
 }
 
@@ -1085,7 +1168,8 @@ document.addEventListener('click',function(ev){
     case 'tab': setTab(el.getAttribute('data-tab'));break;
     case 'cat': setCat(el.getAttribute('data-cat'));break;
     case 'quick': setQuery(el.getAttribute('data-q'));break;
-    case 'clearq': setQuery('');$('#q').focus();break;
+    case 'clearq': $('#q').blur();setQuery('');break;
+    case 'reset': resetSearch();break;
     case 'fav': toggleFav(el.getAttribute('data-item'));break;
     case 'wcard': walletTap(pid);break;
     case 'hcard':
@@ -1123,6 +1207,16 @@ document.addEventListener('click',function(ev){
 });
 document.addEventListener('keydown',function(ev){
   if(ev.key==='Escape'&&sheetMode){closeSheet();return;}
+  if(ev.key==='Tab'&&sheetMode){
+    var f=$$('#sheet button:not([disabled]),#sheet a[href],#sheet input,#sheet select').filter(function(x){return x.offsetParent!==null;});
+    if(f.length){
+      var a=document.activeElement,first=f[0],last=f[f.length-1];
+      if(!$('#sheet').contains(a)){ev.preventDefault();first.focus();}
+      else if(ev.shiftKey&&a===first){ev.preventDefault();last.focus();}
+      else if(!ev.shiftKey&&a===last){ev.preventDefault();first.focus();}
+    }
+    return;
+  }
   var el=ev.target;
   if((ev.key==='ArrowLeft'||ev.key==='ArrowRight')&&el.closest&&el.closest('.rail')){
     var rl=el.closest('.rail'),n=railIndex(rl)+(ev.key==='ArrowRight'?1:-1);
@@ -1134,7 +1228,7 @@ document.addEventListener('keydown',function(ev){
 document.addEventListener('input',function(ev){
   var t=ev.target;
   if(t.classList&&t.classList.contains('amt-in')){
-    state.amt=t.value;
+    state.amt=t.value;syncReset();
     $$('.amt-in').forEach(function(x){if(x!==t)x.value=t.value;});
     if(state.tab==='calc') renderCalcBody(); else updateAmts();
   }else if(t.id==='cq'){
@@ -1153,7 +1247,7 @@ document.addEventListener('change',function(ev){
 var qT=null;
 $('#q').addEventListener('input',function(e){
   var v=e.target.value;$('#btnClear').hidden=!v;
-  clearTimeout(qT);qT=setTimeout(function(){state.q=v;if(state.tab!=='search')setTab('search');else renderSearch();},120);
+  clearTimeout(qT);qT=setTimeout(function(){state.q=v;syncReset();if(state.tab!=='search')setTab('search');else renderSearch();},120);
 });
 $('#q').addEventListener('keydown',function(e){if(e.key==='Enter')e.target.blur();});
 
