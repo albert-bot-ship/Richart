@@ -607,12 +607,24 @@ mark{
 [data-theme="luxe"] .tc-max b,[data-theme="luxe"] .tc-rate{font-family:"Bodoni Moda","Didot",serif;font-style:italic;font-weight:700}
 [data-theme="luxe"] .today-card .btn.ghost{color:#E2C893}
 
-/* ---------- 搜尋欄重置 ---------- */
-.reset-btn{
-  flex:none;height:var(--tap);padding:0 14px;border-radius:var(--radius-sm);
-  border:1px solid var(--line-strong);background:var(--surface);color:var(--accent);font-weight:700;font-size:14px;
+/* ---------- 搜尋欄重置（框內） ---------- */
+.search-box input{padding-right:72px}
+.reset-in{
+  position:absolute;right:5px;height:34px;padding:0 14px;border-radius:calc(var(--radius-sm) - 3px);
+  background:var(--surface-2);color:var(--text);font-weight:700;font-size:14px;
 }
-[data-theme="luxe"] .reset-btn{font-family:var(--font-head);letter-spacing:.08em}
+[data-theme="luxe"] .reset-in{font-family:var(--font-head);letter-spacing:.08em;color:var(--accent)}
+
+/* 設定鈕旁等級 */
+#btnSettings{width:auto;gap:4px;padding:0 10px;display:flex;align-items:center}
+.set-badge{font-weight:800;font-size:15px}
+
+/* 結帳付款方式預設收合 */
+.pay-box > summary{min-height:36px;display:flex;align-items:center;font-weight:700;cursor:pointer;list-style:none}
+.pay-box > summary::-webkit-details-marker{display:none}
+.pay-box > summary::after{content:"＋";margin-left:auto;color:var(--text-2)}
+.pay-box[open] > summary::after{content:"－"}
+.pay-box > p:first-of-type{margin-top:2px}
 
 /* ---------- 假日刷提示 ---------- */
 .hol-banner{
